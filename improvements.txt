@@ -1,0 +1,241 @@
+VIDEO-TO-WEBSITE SKILL — AUDIT & IMPROVEMENTS (v2 fork)
+=========================================================
+Scope: audit of the original `video-to-website` skill (11+ production
+iterations, ROKH cosmetics project) against current (2026) external
+best practices for scroll-driven video websites, video compression,
+and web performance, followed by a list of concrete changes made in
+this v2 fork and why. Sources are listed at the end; full technical
+detail for each change lives in references/qc-and-compression-research.md.
+
+
+1. WHAT THE ORIGINAL SKILL ALREADY GETS RIGHT
+-----------------------------------------------
+This is a genuinely mature skill — worth stating plainly before listing
+gaps, so the changes below read as additions, not a rewrite.
+
+- 49 documented anti-patterns, each tied to a real, diagnosed bug. That's
+  unusually rigorous; most "best practice" guides online are generic,
+  this one is empirically earned.
+- Already does 2-pass VBR compression, short-GOP re-encoding for smooth
+  scrubbing, and multi-bitrate delivery (original/600kbps/300kbps) —
+  which matches current guidance almost exactly (see section 3 below).
+- Already tested AV1/VP9/AVIF against H.264/WebP for this specific use
+  case (scrub video) and correctly found H.264 + WebP win for random-
+  access seeking, not just streaming. That's a rare thing to see
+  actually measured rather than assumed.
+- Strong, specific rules against common "premium site" failure modes:
+  vh-vs-% positioning bugs, cover-vs-contain cropping, iOS video
+  autoplay/PiP gotchas, RTL/LTR flex-direction traps, etc.
+
+
+2. THE GAP: NO UPFRONT QC GATE
+-----------------------------------------------
+This was the main gap and the reason for this fork. The original skill's
+Step 3 ("Analyze the Video") only *informs* the build — it records
+duration/resolution/orientation for internal use. It does not check file
+size, flag an unusual codec, or ask the user anything. Compression only
+enters the picture reactively, in the "Multi-bitrate compression case
+study" in lessons-learned.md — i.e. after a full research-and-build
+cycle, after delivery, after the user says the page feels heavy.
+
+That ordering has a real cost: research, scaffolding, and a full QA loop
+all happen before anyone finds out the source video was 80MB ProRes, or
+had a 21:9 aspect ratio that needs special handling, or was already
+well-compressed and needed none of this. Two problems follow from that:
+
+  a) Wasted work when the file needs re-encoding before anything else
+     makes sense to build.
+  b) No informed consent from the user about the size/quality trade-off
+     up front. The original flow defaults to "build it, see what
+     happens, let the user complain if it's too heavy" — which is
+     exactly the pattern the ROKH compression case study shows working,
+     but only after 5 extra iterations of back-and-forth.
+
+Your framing in the request — check size/codec/aspect ratio first, then
+ask the user whether they want a heavy version, a compressed version, or
+to re-upload something smaller — is the fix for exactly this. It moves
+the same compression tooling the skill already has to the front of the
+workflow and turns an implicit assumption ("build heavy, wait for
+complaints") into an explicit choice.
+
+v2 change: added "Step 0: Pre-Flight Video QC & Weight Decision" as a
+hard gate before Step 1 (research), with concrete thresholds (file size,
+codec/container, aspect ratio, bitrate-for-resolution) and a single
+decision prompt when any threshold is tripped. If the file is already
+comfortable, Claude states that in one line and moves on — the goal is
+to remove wasted rebuild cycles, not to add a mandatory question to
+every single run.
+
+
+3. CODEC GUIDANCE: UPDATED, NOT REVERSED
+-----------------------------------------------
+The original skill's AV1/VP9 conclusion (rows 46/47 in the anti-pattern
+table) was based on one real test: a 10-second portrait clip, encoded
+with the encoder builds available at the time, where AV1 was 5-10x
+slower than H.264 with no size win, and VP9's random-access performance
+was worse than H.264's short-GOP setup. That conclusion still holds as
+the *safe default* for this skill's specific use case (scrub video,
+i.e. random-access seeking, not sequential streaming).
+
+But current (2026) encoder benchmarks show the underlying landscape has
+moved: SVT-AV1 is now a practical encoder at roughly 3-8x slower than
+H.264 (the old libaom-av1 encoder the original test likely used was
+20-50x slower), and hardware AV1 decoding is now common on flagship
+phones and Apple Silicon. Industry deployment data still shows H.264
+far ahead in production usage (84% vs 17%), so this isn't a case for
+switching defaults — it's a case for not treating a specific 2025 test
+result as a permanent law.
+
+v2 change: kept H.264 short-GOP as the default (unchanged), but reframed
+the rule as "measure, don't assume" and gave an explicit escape hatch —
+if a user explicitly wants the smallest possible file and accepts one
+extra encode pass, test SVT-AV1 as an *additional* <source> with H.264
+fallback and measure the actual result on that specific clip, rather
+than either blindly avoiding AV1 forever or blindly assuming it now
+always wins.
+
+
+4. NEW: NETWORK-ADAPTIVE DELIVERY (RUNTIME, NOT JUST BUILD-TIME)
+-----------------------------------------------
+The existing multi-bitrate delivery approach solves the problem at
+build time: it hands the *user* (the person commissioning the site)
+three files and lets them pick one for all their visitors. That's a
+reasonable default, but it means every visitor gets the same tier
+regardless of their own connection — someone on fast wifi and someone
+on a train both get whatever tier was chosen for the whole audience.
+
+The Network Information API (navigator.connection.effectiveType /
+.saveData / .downlink) lets the *page itself* pick a lighter or heavier
+video source based on the individual visitor's measured connection
+quality, at the moment they load the page. Support is Chromium-only
+(no Safari/Firefox), so it has to degrade to a sane default (the
+"recommended" tier) rather than assuming every browser supports it.
+
+v2 change: added a third Step 0 option, "network-adaptive," alongside
+"heavy" and "robust." When chosen, the build ships two video tiers
+inlined together and a small runtime loader picks between them per
+visitor. This is the closest thing to "best of both worlds" the request
+was asking about — heavy quality for people who can afford it,
+automatically lighter for people who can't — at the cost of a larger
+combined file (both tiers are embedded) and slightly more JS. This is
+offered as a choice, not a silent default, because that trade-off
+should be visible to the user making the decision.
+
+
+5. NEW: ACCESSIBILITY / prefers-reduced-motion
+-----------------------------------------------
+The original skill didn't mention prefers-reduced-motion anywhere.
+Given the skill's entire premise is scroll-jacked, pinned, canvas/video-
+scrubbed motion, this was a real gap: scroll-jacking is a documented
+trigger for vestibular disorders (dizziness, nausea, loss of balance)
+in motion-sensitive users, and prefers-reduced-motion is the standard,
+well-supported way to detect that preference and provide a static
+equivalent.
+
+v2 change: added a required prefers-reduced-motion fallback (checklist
+item, Definition-of-Done gate, and a concrete JS/CSS pattern in the new
+reference file) — reduced-motion visitors get native scroll, no
+scroll-scrubbing, and section content visible by default instead of
+gated behind a scroll-triggered reveal animation.
+
+
+6. SCOPED: "3D" AND SCROLL-JACKING VS. CORE WEB VITALS
+-----------------------------------------------
+Your brief asked for "a 3D scrolling website that is fast and robust."
+Worth being precise about what this skill actually produces: a 2D
+canvas/video parallax experience with layered, offset-positioned
+content (the "Apple product page" style) — not literal WebGL 3D
+geometry. That distinction matters because current 2026 commentary
+specifically flags *interactive 3D* and *scroll-jacking animation* as
+trend-driven Core Web Vitals risks: an unoptimized WebGL hero or
+autoplay video sitting in the LCP slot pushes Largest Contentful Paint
+past its target, and scroll-jacking runs on the main thread, competing
+with the browser's ability to respond to taps (hurting INP) — especially
+on older/budget Android devices. The same source cites the well-known
+finding that a one-second delay can cost roughly 7% of conversions.
+
+This is directly in tension with "fast and robust," and it's exactly
+the tension your brief flagged when you asked for a QC/compression gate
+in the first place — this section is the "why" behind that instinct.
+
+v2 change: didn't remove or water down the skill's scroll-jacked
+technique (it's the whole point, and it's well-executed already), but:
+  - Added an explicit, opt-in-only path for adding *true* Three.js/WebGL
+    3D (Step 6b) — only when the user confirms they want literal 3D
+    geometry, not just a "premium" scroll feel, with its own perf budget
+    check afterward (specifically LCP).
+  - Made the prefers-reduced-motion fallback (section 5) mandatory
+    rather than optional, since it's the direct mitigation for the
+    scroll-jacking risk this technique inherently carries.
+  - Added LCP as a tracked metric in the Performance Budget table
+    (target ≤2.5s), which the original budget didn't include.
+
+
+7. WHAT DIDN'T CHANGE
+-----------------------------------------------
+To be clear about scope: the core build workflow (research, scrub-
+method choice, frame/video prep, scaffold, HTML/CSS/JS build, QA loop),
+the 49 original anti-patterns, the animation type reference, the
+e-commerce content rules, and the standalone-single-file delivery
+default are all unchanged. This fork adds a gate at the front and a
+few guardrails; it doesn't rebuild the parts that were already working.
+
+
+8. CORRECTION — AUDIO STRIPPING (added after review)
+-----------------------------------------------
+The original skill's Path A ffmpeg commands already strip audio (`-an`)
+in every re-encode — correctly, since every build in this skill mutes
+the <video> element (Anti-pattern #34), so an audio track downloads but
+is never heard. The first draft of this v2 fork carried that `-an` flag
+through the "robust/compressed" recipe but dropped it from the new
+"heavy/cinematic" recipe, and didn't call audio-stripping out as its
+own explicit action anywhere.
+
+That was a real gap, and it's a more clear-cut win than anything else
+in this document: unlike the size/quality trade-offs in section 2 (some
+visible quality loss in exchange for a smaller file), stripping an
+unheard audio track costs nothing. It should never be gated behind the
+heavy/robust/adaptive choice — it applies to all three.
+
+Fixed: Step 0 now flags whether the source has an audio stream as part
+of the initial probe, `-an` is unconditional across every tier's
+re-encode command, and the Step 0 message to the user mentions it as a
+heads-up rather than a choice. See SKILL.md Step 0, point 3a, and
+references/qc-and-compression-research.md §1b.
+
+
+SOURCES CONSULTED
+=========================================================
+- superrendersfarm.com — "H.264 vs H.265: Video Encoding Guide for 3D
+  Artists" (2026)
+- red5.net — "AV1 vs H.264 in 2026: Quality, Speed, Cost, Compatibility"
+- transloadit.com — "How to compress video with FFmpeg" (2026)
+- mux.com — "How to compress video files while maintaining quality
+  with ffmpeg"
+- vibbit.ai — "FFmpeg CRF Examples: H.264, H.265, VP9 & AV1 (2026)"
+- ffmpeglab.com — "Video Compression with FFmpeg – Complete Guide to
+  Reducing File Size" (2026)
+- ffhub.io — "FFmpeg Video Compression: Best Practices Guide"
+- ezwebtools.net — "Video Compression Complete Guide: From Principles
+  to FFmpeg Practical Use" (2026)
+- jacobtyler.com — "2026 Web Design Trends Are a Core Web Vitals
+  Problem" (2026)
+- involvedigital.com — "Core Web Vitals & Website Performance Guide
+  2026"
+- youcom.agency — "How to Make Your Website Faster: Practical
+  Performance Best Practices for 2026"
+- smashingmagazine.com — "Respecting Users' Motion Preferences"
+- css-tricks.com — "prefers-reduced-motion"
+- blog.pope.tech — "Designing accessible animation and movement on
+  your website" (2025)
+- blog.openreplay.com — "Using prefers-reduced-motion for Accessible
+  Animation" (2026)
+- web.dev — "Adaptive loading: improving web performance on slow
+  devices"; "Adaptive serving based on network quality"
+- developer.mozilla.org — "Network Information API"
+- addyosmani.com — "Adaptive Serving using JavaScript and the Network
+  Information API"
+
+Full technical detail (probe scripts, ffmpeg recipes, loader code,
+CSS/JS patterns) for every change above lives in:
+  references/qc-and-compression-research.md
