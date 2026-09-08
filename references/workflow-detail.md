@@ -82,6 +82,281 @@ Skip Steps 4b, 5.1, 5.3, 9b, 9c — no frame extraction, no per-frame bg samplin
 
 Continue to Step 3 (probe) → Step 4b (extract) → Step 5 (compress + bg sample) → Step 6 (scaffold with canvas renderer in Step 9c).
 
+---
+
+### The 4 Anti-Lag Scrubbing Modes (Zero-Lag Scrollytelling Architecture)
+
+When users flick their mouse wheel or trackpad quickly across a scroll-driven 3D website, a standard `<video>` setup experiences a severe **Hardware Decoder Bottleneck**:
+1. **The Root Cause of Scrub Lag**: Video codecs (H.264/H.265/VP9) rely on temporal compression with **I-frames (Keyframes)** and **P/B-frames (delta predictions)**. When `video.currentTime` is updated rapidly at 60–120Hz, the hardware decoder cannot jump instantly to arbitrary non-keyframes. It must seek backward to the preceding I-frame and sequentially decode all intermediate frames up to the target timestamp. Rapid scrolling floods the browser's decode queue, causing dropped frames, frozen visuals, and severe input latency.
+
+Here are the **4 Architectural Modes** to eliminate video scrub lag completely:
+
+```
+                                  SCROLLYTELLING SCRUB ARCHITECTURES
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│ Mode 1: Apple Image Sequence (Canvas + WebP) ★ GOLD STANDARD                                           │
+│   • FPS: 120fps+ | Lag: 0% (Zero) | Decoder: Bypassed | Tech: ctx.drawImage + 3-Stage Stride Loader    │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Mode 2: All-Intra Video (GOP = 1)                                                                      │
+│   • FPS: 30-60fps | Lag: Minimal (<10ms) | Decoder: Active | Tech: FFmpeg keyint=1 (Every frame is I)  │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Mode 3: Damped Front-End Scrubbing + FastSeek                                                          │
+│   • FPS: 30-60fps | Lag: Low (Smoothed) | Decoder: Active | Tech: scrub: 1.2 + video.fastSeek() + rAF │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Mode 4: Native WebGL / Three.js 3D Scene                                                               │
+│   • FPS: 60-120fps | Lag: 0% (Zero) | Decoder: None | Tech: GLB/Draco + Camera/Rotation Matrix         │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### Mode 1: The Apple Image Sequence Standard (Canvas + WebP) ★ (Recommended)
+
+This is the technique **Apple** uses on product showcase pages (AirPods Pro, Mac Studio, iPhone Pro). Apple **never uses `<video>` tags for scrub-driven scrollytelling**.
+
+##### How it works:
+1. Extract 120–240 WebP frames from the 3D render at 15–24 fps.
+2. Render frames directly to an HTML5 `<canvas>` using `ctx.drawImage()`.
+3. The browser bypasses the video decoder entirely; raw decoded bitmaps are uploaded directly to GPU textures.
+4. **3-Stage Progressive Loader with Stride**:
+   - **Stage 1 (Immediate FCP, <100ms)**: Load Frame 0 and render immediately so the hero is visible on first paint.
+   - **Stage 2 (Keyframe Stride Coverage)**: Load every 8th frame (stride = 8). Once ~70% of stride frames are ready, hide the preloader and unlock scrolling. The user can scroll immediately with continuous visual feedback!
+   - **Stage 3 (Background Pool)**: Load the remaining frames in the background without blocking the UI.
+5. **Nearest-Loaded-Neighbor Fallback**: If the user scrolls rapidly into a section where frame (N) is still downloading, the renderer instantly draws the nearest loaded frame ((|k - N| 	o min)). Result: **Zero blank frames, zero stutter, zero decoder freeze**.
+
+##### Complete Implementation Code:
+
+```html
+<div class="video-wrap" id="videoWrap">
+  <canvas id="scrub-canvas"></canvas>
+  <div class="video-vig"></div>
+</div>
+```
+
+```javascript
+/* CANVAS IMAGE SEQUENCE DATA (Apple Scrollytelling Standard) */
+var TOTAL_FRAMES = 240;
+var FRAME_DIR = "/showcase/bmw-frames/";
+var FRAME_PREFIX = "frame_";
+var FRAME_EXT = ".webp";
+var FRAME_SPEED = 1.0;
+
+(function() {
+  var canvas = document.getElementById("scrub-canvas");
+  var ctx = canvas ? canvas.getContext("2d", { alpha: false, desynchronized: true }) : null;
+  var scrollContainer = document.getElementById("scroll-container");
+  var loader = document.getElementById("loader");
+  var loaderBar = document.getElementById("loader-bar");
+  var loaderPct = document.getElementById("loader-pct");
+
+  var images = new Array(TOTAL_FRAMES);
+  var loadedFrames = new Set();
+  var currentFrameIndex = 0;
+
+  function pad(n, width) {
+    var s = n.toString();
+    while (s.length < width) s = "0" + s;
+    return s;
+  }
+
+  function getFrameUrl(index) {
+    return FRAME_DIR + FRAME_PREFIX + pad(index + 1, 4) + FRAME_EXT;
+  }
+
+  function resizeCanvas() {
+    if (!canvas || !ctx) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    var w = window.innerWidth;
+    var h = window.innerHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + "px";
+    canvas.style.height = h + "px";
+    renderFrame(currentFrameIndex, true);
+  }
+  window.addEventListener("resize", resizeCanvas, { passive: true });
+
+  function renderFrame(index, force) {
+    if (!ctx || !canvas) return;
+    if (index === currentFrameIndex && !force && loadedFrames.has(index)) return;
+
+    // Nearest Loaded Neighbor Fallback: zero blank screens on rapid scroll
+    var imgToDraw = images[index];
+    if (!imgToDraw || !imgToDraw.complete || imgToDraw.naturalWidth === 0) {
+      var nearest = -1;
+      var minDiff = 9999;
+      loadedFrames.forEach(function(loadedIdx) {
+        var diff = Math.abs(loadedIdx - index);
+        if (diff < minDiff) {
+          minDiff = diff;
+          nearest = loadedIdx;
+        }
+      });
+      if (nearest !== -1 && images[nearest] && images[nearest].complete) {
+        imgToDraw = images[nearest];
+      }
+    }
+
+    if (!imgToDraw || !imgToDraw.complete || imgToDraw.naturalWidth === 0) return;
+
+    currentFrameIndex = index;
+
+    // Hardware-accelerated cover math
+    var cw = canvas.width;
+    var ch = canvas.height;
+    var iw = imgToDraw.naturalWidth;
+    var ih = imgToDraw.naturalHeight;
+    var scale = Math.max(cw / iw, ch / ih);
+    var nw = iw * scale;
+    var nh = ih * scale;
+    var ox = (cw - nw) * 0.5;
+    var oy = (ch - nh) * 0.5;
+
+    ctx.drawImage(imgToDraw, ox, oy, nw, nh);
+  }
+
+  function loadImageSequence() {
+    var loadedCount = 0;
+    var initialKeyframes = [];
+
+    // Stage 1: Load frame 0 immediately (<100ms FCP)
+    var firstImg = new Image();
+    firstImg.src = getFrameUrl(0);
+    firstImg.onload = function() {
+      images[0] = firstImg;
+      loadedFrames.add(0);
+      resizeCanvas();
+      renderFrame(0, true);
+      if (loaderBar) loaderBar.style.width = "40%";
+    };
+
+    // Stage 2: Stride loading (every 8th frame for instant scroll coverage)
+    var stride = 8;
+    for (var i = 0; i < TOTAL_FRAMES; i += stride) {
+      if (i !== 0) initialKeyframes.push(i);
+    }
+
+    var keyframesLoaded = 0;
+    initialKeyframes.forEach(function(kIdx) {
+      var img = new Image();
+      img.src = getFrameUrl(kIdx);
+      img.onload = function() {
+        images[kIdx] = img;
+        loadedFrames.add(kIdx);
+        keyframesLoaded++;
+        if (keyframesLoaded >= Math.floor(initialKeyframes.length * 0.7)) {
+          if (loaderBar) loaderBar.style.width = "85%";
+          setTimeout(function() {
+            if (loader) loader.classList.add("hidden");
+            if (typeof ScrollTrigger !== "undefined") ScrollTrigger.refresh();
+          }, 200);
+        }
+      };
+    });
+
+    // Stage 3: Background pool for all remaining frames
+    for (var idx = 0; idx < TOTAL_FRAMES; idx++) {
+      if (images[idx]) continue;
+      (function(fIdx) {
+        var img = new Image();
+        img.src = getFrameUrl(fIdx);
+        img.onload = function() {
+          images[fIdx] = img;
+          loadedFrames.add(fIdx);
+          loadedCount++;
+          var pct = Math.min(100, Math.round((loadedCount / TOTAL_FRAMES) * 100));
+          if (loaderBar) loaderBar.style.width = pct + "%";
+          if (pct >= 95 && loader) loader.classList.add("hidden");
+        };
+        img.onerror = function() { loadedCount++; };
+      })(idx);
+    }
+  }
+
+  function setupCanvasScrub() {
+    if (typeof ScrollTrigger === "undefined") return;
+    ScrollTrigger.create({
+      trigger: scrollContainer,
+      start: "top top",
+      end: "bottom bottom",
+      scrub: 0.5,
+      onUpdate: function(self) {
+        var accelerated = Math.min(self.progress * FRAME_SPEED, 1);
+        var targetIndex = Math.min(Math.floor(accelerated * TOTAL_FRAMES), TOTAL_FRAMES - 1);
+        renderFrame(targetIndex);
+      }
+    });
+  }
+
+  loadImageSequence();
+  setupCanvasScrub();
+})();
+```
+
+---
+
+#### Mode 2: All-Intra Video Encoding (`GOP = 1` / Keyframe at Every Frame)
+
+If you must use a single `<video>` MP4 file (e.g. strict single-video file deployment), you must eliminate inter-frame temporal dependencies. By setting `keyint=1`, **every frame is encoded as an independent I-frame**.
+
+##### FFmpeg All-Intra Command:
+```bash
+ffmpeg -i showcase_input.mp4   -c:v libx264   -x264opts keyint=1:min-keyint=1:scenecut=0   -pix_fmt yuv420p   -profile:v high   -preset medium   -b:v 3.5M   -an   -movflags +faststart   output_all_intra.mp4
+```
+
+- **Why it works**: Decoder seek latency drops from 200–500ms to <10ms because the decoder never needs to backtrack or reconstruct delta frames.
+- **Trade-off**: File size is ~25% to 40% larger than long-GOP video at equivalent visual quality.
+
+---
+
+#### Mode 3: Damped Front-End Scrubbing + `video.fastSeek()` + rAF Coalescing
+
+When using a moderately compressed video (e.g. `-g 10`), front-end physics damping and hardware-accelerated seeking prevent user scroll spikes from overwhelming the decoder:
+
+##### 1. Damped Inertia in ScrollTrigger (`scrub: 1.2`):
+Never use `scrub: true`. A numerical scrub value introduces a smooth spring/lerp that filters out abrupt wheel jerks:
+```javascript
+ScrollTrigger.create({
+  trigger: scrollContainer,
+  start: "top top",
+  end: "bottom bottom",
+  scrub: 1.2, // 1.2s smooth damping inertia
+  onUpdate: (self) => seekVideo(self.progress)
+});
+```
+
+##### 2. Hardware `fastSeek` with rAF Throttling:
+```javascript
+let pendingSeek = null;
+
+function seekVideo(progress) {
+  if (!video || !state.videoReady) return;
+  const targetTime = progress * state.videoDuration;
+
+  if (pendingSeek) return;
+  pendingSeek = requestAnimationFrame(() => {
+    pendingSeek = null;
+    // Skip redundant sub-frame seeks (<16ms)
+    if (Math.abs(video.currentTime - targetTime) > 0.016) {
+      if ('fastSeek' in video) {
+        video.fastSeek(targetTime); // Hardware-accelerated coarse seek
+      } else {
+        video.currentTime = targetTime;
+      }
+    }
+  });
+}
+```
+
+---
+
+#### Mode 4: Native WebGL / Three.js 3D (Interactive GLB Model)
+
+Instead of pre-rendered 2D video frames, load a 3D model (GLTF/GLB) with Draco compression and update camera/model transforms directly on the GPU render loop:
+- **Zero decoder bottleneck**: No video decoding whatsoever.
+- **Payload**: Often only 1.5MB–3.5MB for optimized 3D geometry and textures.
+- **Usage**: Use when true interactive 3D rotation, real-time lighting, or orbit controls are required.
+
 ### Step 3: Analyze the Video
 
 ```bash

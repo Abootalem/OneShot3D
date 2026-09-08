@@ -251,6 +251,21 @@ front-end failure modes that were not addressed in v2.0:
    - Fix: Maintained 440vh-480vh for precise 1:1 scrub mapping while compacting intra-card spacing.
 
 
+7. Elimination of Video Scrub Lag & Decoder Bottleneck (The 4 Anti-Lag Modes):
+   - Problem: In scrollytelling websites using <video>, rapid mouse wheel scrolling flooded the browser's
+     hardware video decoder with seek requests. Because standard videos use inter-frame temporal compression
+     (P/B frames depending on distant I-frames), the decoder had to backtrack and decode intermediate frames,
+     causing massive frame drops, hitching, and visual freezes.
+   - Fix: Formulated and documented the 4 Anti-Lag Architectural Modes:
+     * Mode 1 (Apple Canvas + WebP Image Sequence): Bypasses the video decoder completely. Implements
+       a 3-stage progressive stride loader (Frame 0 -> Stride 8 -> Background Pool) and nearest-loaded-neighbor
+       fallback for 120fps zero-lag rendering.
+     * Mode 2 (All-Intra Re-encoding): Re-encodes video with keyint=1 (every frame is an I-frame), dropping seek
+       latency from 500ms to <10ms.
+     * Mode 3 (Damped Scrubbing + FastSeek): Uses GSAP scrub: 1.2 for physical inertia + browser fastSeek() API.
+     * Mode 4 (Native WebGL 3D): Direct GPU 3D rendering driven by camera/rotation transforms.
+
+
 SOURCES CONSULTED
 =========================================================
 - superrendersfarm.com — "H.264 vs H.265: Video Encoding Guide for 3D

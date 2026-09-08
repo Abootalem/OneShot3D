@@ -112,6 +112,7 @@ If the user doesn't specify these, ask briefly or use sensible creative defaults
 27. **Zero pseudo-element overflow** — no negative insets (`inset: -Xpx`) on pseudo-elements inside cards with `overflow: auto`. Always add `overflow-x: hidden;` to permanently eliminate horizontal scrollbars.
 28. **Integrated 3-column header** — never inject isolated `position: fixed` return/portal buttons that overlap brand marks. Integrate portal chips inside the primary `.site-header` grid.
 29. **Header clearance for hero** — `.hero-standalone` must have `padding-top: calc(var(--header-h) + 36px)` so large titles are never sliced by the fixed navbar.
+30. **Zero video scrub lag (The 4 Anti-Lag Modes)** — never use long-GOP video with unthrottled `scrub: true` (causes decoder bottleneck and massive frame drops on fast scroll). Implement one of the 4 proven modes: Mode 1 (Apple Canvas + WebP Image Sequence with 3-stage progressive stride loader and nearest-neighbor fallback for 120fps zero-lag), Mode 2 (All-Intra video with `keyint=1`), Mode 3 (Damped front-end scrubbing `scrub: 1.2` + `fastSeek` + rAF coalescing), or Mode 4 (Native WebGL/Three.js 3D).
 
 
 ---
@@ -233,6 +234,7 @@ These are all real bugs. Each one cost 30+ minutes to diagnose on a production b
 | 58 | Binary `opacity = 1` jump on enter + non-overlapping section spans | Cards pop into existence abruptly like a switch, sit frozen for 75% of scroll time, then snap out into a blank screen before next card pops in ("instant transition between cards") | Use Continuous Parallax Crossfade Engine: 3-phase Smoothstep interpolation (glide-in from +36px, stable hold, glide-out to -32px), with 4-6% overlapping section ranges. |
 | 59 | Standalone `position: fixed; top: 20px; right: 20px;` return button | Collides with brand logo in RTL and LTR, giving optical illusion of navbar jumping sides; hero title has no clearance for fixed navbar and gets sliced | Integrate portal chip into 3-column `.site-header`. Give hero `padding-top: calc(var(--header-h) + 36px);`. |
 | 60 | Misinterpreting "too much empty space" by over-compressing scroll container (< 400vh) | Scroll distance becomes too short (~280vh), mouse wheel flings through sections in fractions of a second, depleting or rushing 3D animations | Maintain 440vh - 480vh for 1:1 video scrub mapping, while compacting intra-card spacing. |
+| 61 | Unthrottled long-GOP video scrubbing with `scrub: true` | Rapid mouse wheel scrolling floods the browser video decoder with hundreds of seek requests; decoder must seek to distant keyframes and rebuild forward, causing severe hitching, frame drops, and lag | Implement one of the 4 Anti-Lag Scrubbing Modes: Apple Canvas Image Sequence with nearest-neighbor fallback (Mode 1 - zero lag, 120fps), All-Intra `keyint=1` encoding (Mode 2), Damped `scrub: 1.2` with `video.fastSeek()` (Mode 3), or WebGL 3D (Mode 4). |
 
 
 ---
@@ -273,6 +275,8 @@ Real user feedback from the ROKH project, with the underlying bug and fix:
 | "for bmw showcase the navbar on farsi is left and in english went to right. also the navbar covered the text BMW PARTS PRO" | Standalone floating back button at `top: 20px; right: 20px;` collided with brand logo on RTL and LTR, creating the illusion of navbar jumping sides; hero title lacked `padding-top` clearance | Remove floating button; embed `.portal-chip` inside 3-column header. Add `padding-top: calc(var(--header-h) + 36px)` to hero container. |
 | "on rokh all pop up menues cropped and not truely shown by scroll" | 850px card height exceeded 600px laptop viewport due to 1:1 square product images and 5rem headings; Lenis hijacked wheel events so user couldn't scroll card content | Apply High-Density Compact Layout (height ≤ 420px, images 105px contain). Add `data-lenis-prevent="true"` to `.section-inner`. Remove negative insets to fix horizontal scrollbar. |
 | "in all 3d showcases the scrolling cause instant transition between cards and not visually satisfactory" | Binary opacity jump (0 to 1), non-overlapping section ranges with dead gaps, and 0.02 fast fade-out caused cards to abruptly pop in and pop out | Implement Continuous Parallax Crossfade Engine with 3-phase Smoothstep interpolation (+36px glide-in, hold, -32px glide-out) and 4-6% overlapping section ranges. |
+| "سایتهای سه بعدی این باگ رو دارند که چون بر اساس رندر یک ویدیو هستند وقتی کاربر یک کم سریع اسکرول میکنه دچار یک لگ اساسی میشن و ظاهر خوبی نداره. راه حل؟؟" (3D sites have this bug where fast scroll causes massive lag because they render video. What's the solution?) | Browser video decoder bottleneck caused by seeking long-GOP video at 60+ Hz while user flicks mouse wheel. Decoder cannot decode fast enough and drops frames. | Deploy the 4 Anti-Lag Scrubbing Modes: (1) Apple Canvas + WebP Sequence with 3-stage progressive loading & nearest-neighbor fallback (zero lag at 120fps), (2) All-Intra video `keyint=1`, (3) Damped front-end scrubbing (`scrub: 1.2`) + `fastSeek`, or (4) Native WebGL 3D. |
+| "حالت اول رو درست کن" (implement the first mode / Apple Canvas sequence) | User selected Mode 1 (Apple Image Sequence) as the gold standard for zero lag | Converted video to WebP image sequence (120-240 frames), implemented 3-stage progressive loader (Frame 0 -> Stride 8 -> Pool) and nearest-loaded-neighbor fallback rendering on `<canvas>`. |
 
 
 ---
@@ -402,6 +406,7 @@ Then call `present_files` on whatever landed in `/mnt/user-data/outputs/` — a 
 - **Card content cannot be scrolled by mouse wheel**: Lenis smooth-scroll is hijacking wheel events. Add `data-lenis-prevent="true"` to the scrollable container.
 - **Cards pop in or pop out instantly**: Binary opacity setting and non-overlapping section ranges. Implement the 3-phase Smoothstep Parallax Crossfade Engine and overlap adjacent section ranges by 4–6%.
 - **Navbar covers hero title**: Hero container lacks clearance for fixed header. Add `padding-top: calc(var(--header-h) + 36px);` and adjust title font-size to `clamp(3.2rem, 7.5vw, 6.5rem)`.
+- **Video scrub lags, stutters, or drops frames on fast scroll**: Long-GOP video decoder bottleneck. Replace with Mode 1 (Apple Canvas + WebP sequence with 3-stage progressive loading), re-encode with Mode 2 (`keyint=1`), or apply Mode 3 (damped `scrub: 1.2` + `video.fastSeek()`).
 
 
 ---
