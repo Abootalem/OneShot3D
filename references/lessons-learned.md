@@ -128,3 +128,58 @@ This doesn't invalidate the case study above — its ffmpeg recipes,
 codec findings, and "don't split files" lesson are all still exactly
 right and still used by Step 0's "robust/compressed" path. It just
 changes *when* the decision gets made.
+
+---
+
+## Lessons From the Field — Production Cropping, Navigation Alignment, and Cinematic Scroll Crossfade (v2.1 Case Study)
+
+After deploying multiple 3D scroll showcases in production (Rokh Luxury Cosmetics, BMW Parts Pro, and Lotus Elegance), rigorous multi-device testing and real user feedback surfaced 6 critical UX and kinematic flaws that broke the luxury experience on standard laptop viewports (e.g. 1366×768 and 1440×900 displays where browser chrome leaves ~600px of usable vertical height).
+
+### 1. Card Bottom Cropping & Card Height Budget (Anti-Pattern #55)
+- **Symptom**: User feedback: *"on rokh all pop up menues cropped and not truely shown by scroll"*.
+- **Root Cause**: Section cards used massive typography (`clamp(2.4rem, 5.5vw, 5rem)`), oversized padding (56px 48px), 32px margins, and unconstrained 1:1 aspect-ratio product images. Total card height blew up to 850px+. On a standard 768p laptop display, the bottom 250px of the card — containing crucial product names, prices, and the "Add to Bag" CTA buttons — was pushed completely off-screen and cropped.
+- **Fix**: High-Density Compact Card Layout:
+  - Heading font-size reduced to `clamp(1.45rem, 2.2vw, 2.05rem)`.
+  - Product images constrained to fixed `height: 105px; width: auto; object-fit: contain;`.
+  - Card padding tightened to `22px 20px`.
+  - Total card height budget strictly enforced at `≤ 420px`, ensuring 100% of card content fits comfortably inside any 600px+ viewport without requiring scroll.
+
+### 2. Lenis Scroll Hijacking on Inner Overflow Containers (Anti-Pattern #57)
+- **Symptom**: When users hovered over a card and tried to scroll its internal contents with the mouse wheel, the card didn't scroll; instead, the whole page advanced and the card vanished.
+- **Root Cause**: Lenis smooth-scroll intercepts wheel events on the `window` object. When an inner container has `overflow-y: auto`, wheel events bubble up and Lenis consumes them to advance the global page scroll.
+- **Fix**: Add `data-lenis-prevent="true"` to all `.section-inner` containers. This instructs Lenis to let inner scrollable containers handle wheel events naturally without advancing page scroll.
+
+### 3. Ghost Horizontal Scrollbars from Pseudo-Elements (Anti-Pattern #56)
+- **Symptom**: An ugly horizontal scrollbar appeared at the bottom of floating cards whenever internal scrolling was triggered.
+- **Root Cause**: `.section-inner::before` used `inset: -40px -32px` to cast an ambient glow. When `overflow-y: auto` was added to `.section-inner`, the negative insets protruded horizontally outside the bounding box, forcing the browser to render a horizontal scrollbar.
+- **Fix**: Eliminate negative insets on pseudo-elements. Apply backdrop blur and glass styling directly to `.section-inner`, and enforce `overflow-x: hidden;`.
+
+### 4. Instant Transitions vs. Continuous Parallax Crossfade Engine (Anti-Pattern #58)
+- **Symptom**: User feedback: *"in all 3d showcases the scrolling cause instant transition between cards and not visually satisfactory"*.
+- **Root Cause**:
+  1. ScrollTrigger callbacks set binary `opacity = 1` immediately upon crossing an enter threshold.
+  2. Cards remained static for 75% of their scroll duration.
+  3. Sections had non-overlapping scroll intervals (e.g. Card 1 at 0.16–0.28, Card 2 at 0.32–0.44) with dead empty gaps between them.
+  4. Fade-outs lasted only 2–4% of scroll distance, popping cards out like switching off a light bulb.
+  5. CSS `transition: opacity 0.4s` fought GSAP `ScrollTrigger` updates on high-refresh displays.
+- **Fix**: Continuous Parallax Crossfade Engine using Smoothstep Kinematics:
+  - Calculate normalized relative progress: `p = (scrollProgress - enterPct) / (leavePct - enterPct)` where `p in [0, 1]`.
+  - **Phase 1 (Glide-In 0.00–0.28)**: Card ascends from `y: +36px` to `0px`, opacity fades from 0 to 1 via Smoothstep curve `e = t^2 * (3 - 2t)`.
+  - **Phase 2 (Stable Hold 0.28–0.72)**: Card holds stably at `y: 0px`, `opacity: 1` for relaxed reading.
+  - **Phase 3 (Glide-Out 0.72–1.00)**: Card ascends further from `y: 0px` to `-32px`, opacity fades from 1 to 0 via Smoothstep.
+  - **Overlapping Ranges**: Adjacent sections overlap by 4–6% (e.g., Section 1: 0.16–0.34; Section 2: 0.30–0.48), creating a seamless dissolve where card N fades out while card N+1 glides in.
+  - Remove all CSS `transition: opacity` on animated cards.
+
+### 5. Navbar Collision & LTR/RTL Flip Illusion (Anti-Pattern #59)
+- **Symptom**: User noted: *"for bmw showcase the navbar on farsi is left and in english went to right. also the navbar covered the text BMW PARTS PRO"*.
+- **Root Cause**:
+  1. A standalone return button was injected at `position: fixed; top: 20px; right: 20px;`. In Persian RTL (`dir="rtl"`), the brand logo is on the right, so the return button sat directly on top of the logo. In English LTR, the logo is on the left, making it look like the navbar jumped sides.
+  2. The hero container had no `padding-top` offset for the fixed navbar, so large hero titles (`clamp(4rem, ...)`) were partially obscured beneath the header.
+- **Fix**:
+  - Delete standalone floating buttons. Integrate `.portal-chip` into the 3-column `.site-header` grid (brand on start, nav in center, portal/language on end).
+  - Add `padding-top: calc(var(--header-h) + 36px);` to the hero container so hero titles never collide with fixed headers.
+
+### 6. Over-Compressing Scroll Container Height (Anti-Pattern #60)
+- **Symptom**: Misinterpreting user feedback "too much empty space" by drastically reducing scroll container height (e.g. down to 280vh).
+- **Root Cause**: Shrinking the scroll height reduces the wheel travel needed to scrub the video. At 280vh, a single mouse wheel flick blasts through 3 sections, making the 3D scrub feel erratic and unmanageable.
+- **Fix**: Keep scroll height generous (440vh–480vh for 5-6 sections) for smooth 1:1 video scrub mapping, while compacting intra-card spacing (padding, font sizes, margins).

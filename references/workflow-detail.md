@@ -428,6 +428,78 @@ For standalone single-file: inline these as `<script>` blocks instead of CDN.
 
 ### Step 8: Build css/style.css
 
+/* --- High-Density Compact Card Layout (v2.1 Anti-Cropping Standard) --- */
+.scroll-section {
+  position: absolute;
+  width: 100%;
+  left: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.section-inner {
+  pointer-events: auto;
+  max-width: 480px;
+  max-height: 420px;            /* STRICT budget: guarantees fit on 768p laptops */
+  padding: 22px 20px;           /* Compact padding */
+  border-radius: 18px;
+  background: rgba(22, 22, 26, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  overflow-y: auto;            /* Allow scrolling if content slightly overflows */
+  overflow-x: hidden;          /* CRITICAL: prevents ghost horizontal scrollbars */
+}
+
+/* Headings within cards MUST use compact clamp */
+.section-heading {
+  font-family: var(--font-display);
+  font-size: clamp(1.45rem, 2.2vw, 2.05rem);
+  line-height: 1.25;
+  margin-bottom: 12px;
+}
+
+/* Product images within cards MUST have fixed height */
+.product-image img,
+.product-card img {
+  height: 105px !important;
+  width: auto !important;
+  object-fit: contain !important;
+  margin: 0 auto;
+}
+
+/* Unified 3-Column Header */
+.site-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--header-h);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4vw;
+  background: rgba(18, 18, 20, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Hero container MUST have clearance for fixed header */
+.hero-standalone {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: calc(var(--header-h) + 36px);  /* CRITICAL: header clearance */
+  padding-bottom: 40px;
+  z-index: 15;
+}
+
+
 Use the **frontend-design** skill for creative, distinctive styling. Key technical patterns:
 
 ```css
@@ -897,103 +969,95 @@ ScrollTrigger.create({
 });
 ```
 
-#### 9e. Section Animation System (with 4% fast fade-out — CRITICAL)
+#### 9e. Continuous Parallax Crossfade Engine (v2.1 Kinematic Standard)
 
-Each section reads `data-animation` and gets a different entrance. Sections with `data-persist="true"` stay visible once animated in. **Position sections absolutely at the midpoint of their enter/leave range using `top: X%` (NOT `vh`!) and `transform: translateY(-35%)`.** Use `-35%` (NOT `-50%`) so the section's title (at the top of `section-inner`) stays visible within the viewport when the section is taller than ~80vh. With `-50%` centering, any section taller than 100vh will have its title scrolled off the top of the viewport.
+**Why v2.1 replaced binary transitions:**
+In v2.0, sections set `opacity = 1` instantly upon entering, remained static for 75% of their scroll duration, and had non-overlapping ranges with dead space between them. On fast or regular mouse wheel scrolling, cards felt disjointed ("instant transition between cards").
+
+v2.1 introduces the **Continuous 3-Phase Smoothstep Crossfade Engine**:
+1. **Phase 1 (Glide-in, 0.00 → 0.28 relative progress)**: Card ascends smoothly from `translateY(36px)` to `0px`, and opacity fades from 0.0 to 1.0 using the Smoothstep polynomial (e = t^2 \cdot (3 - 2t)).
+2. **Phase 2 (Stable hold, 0.28 → 0.72 relative progress)**: Card sits stably at `translateY(0px)`, `opacity: 1` for reading.
+3. **Phase 3 (Glide-out, 0.72 → 1.00 relative progress)**: Card ascends from `translateY(0px)` to `translateY(-32px)`, and opacity dissolves from 1.0 to 0.0.
+4. **Overlapping intervals**: Adjacent sections overlap by 4–6% (e.g. Card 1 active 0.16–0.34, Card 2 active 0.30–0.48). As Card 1 fades out, Card 2 is already ascending into view, eliminating all dead space.
 
 ```js
+// Helper: Smoothstep cubic polynomial for natural cinematic easing
+const smoothstep = (min, max, value) => {
+  const x = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  return x * x * (3 - 2 * x);
+};
+
 function setupSectionAnimations() {
   const sections = document.querySelectorAll(".scroll-section");
+  if (!sections.length || typeof ScrollTrigger === "undefined") return;
 
   sections.forEach((section) => {
-    const type = section.dataset.animation;
-    const persist = section.dataset.persist === "true";
     const enterPct = parseFloat(section.dataset.enter) / 100;
     const leavePct = parseFloat(section.dataset.leave) / 100;
-    const children = section.querySelectorAll(
-      ".section-label, .section-heading, .section-body, .section-note, " +
-      ".section-list, .product-grid, .spotlight-cta-row, .cta-button, .stat"
-    );
+    const persist = section.dataset.persist === "true";
+    const inner = section.querySelector(".section-inner") || section;
 
-    // Initial state
-    const initialStates = {
-      "fade-up":     { y: 50, opacity: 0 },
-      "slide-left":  { x: -80, opacity: 0 },
-      "slide-right": { x: 80, opacity: 0 },
-      "scale-up":    { scale: 0.85, opacity: 0 },
-      "rotate-in":   { y: 40, rotation: 3, opacity: 0 },
-      "stagger-up":  { y: 60, opacity: 0 },
-      "clip-reveal": { clipPath: "inset(100% 0 0 0)", opacity: 0 },
-    };
-    gsap.set(children, initialStates[type] || initialStates["fade-up"]);
-
-    // Build timeline
-    const tl = gsap.timeline({ paused: true });
-    const animConfig = {
-      "fade-up":     { y: 0, opacity: 1, stagger: 0.12, duration: 0.9, ease: "power3.out" },
-      "slide-left":  { x: 0, opacity: 1, stagger: 0.14, duration: 0.9, ease: "power3.out" },
-      "slide-right": { x: 0, opacity: 1, stagger: 0.14, duration: 0.9, ease: "power3.out" },
-      "scale-up":    { scale: 1, opacity: 1, stagger: 0.12, duration: 1.0, ease: "power2.out" },
-      "rotate-in":   { y: 0, rotation: 0, opacity: 1, stagger: 0.1, duration: 0.9, ease: "power3.out" },
-      "stagger-up":  { y: 0, opacity: 1, stagger: 0.15, duration: 0.8, ease: "power3.out" },
-      "clip-reveal": { clipPath: "inset(0% 0 0 0)", opacity: 1, stagger: 0.15, duration: 1.2, ease: "power4.inOut" },
-    };
-    tl.to(children, animConfig[type] || animConfig["fade-up"]);
-
-    // CRITICAL: position via % of scroll-container, NEVER vh
+    // Center card vertically at midpoint of its range
     const midPct = (enterPct + leavePct) / 2;
     section.style.top = (midPct * 100) + "%";
     section.style.transform = "translateY(-35%)";
 
-    // Bind play/reverse to scroll
+    // Continuous scroll-driven kinematic update
     ScrollTrigger.create({
       trigger: scrollContainer,
       start: "top top",
       end: "bottom bottom",
-      scrub: 0.6,
+      scrub: 0.4,
       onUpdate: (self) => {
         const p = self.progress;
+
         if (p < enterPct) {
-          tl.progress(0);
-          section.classList.remove("visible");
+          // Before card's entrance
           section.style.opacity = 0;
-          section.style.transform = "translateY(-35%)";
+          section.style.pointerEvents = "none";
+          inner.style.transform = "translateY(36px)";
         } else if (p >= enterPct && p <= leavePct) {
-          // First 35% of range plays timeline (faster enter),
-          // remaining 65% holds section fully visible for reading.
-          const localProgress = (p - enterPct) / (leavePct - enterPct);
-          const tlProgress = Math.min(1, localProgress / 0.35);
-          tl.progress(tlProgress);
-          section.classList.add("visible");
-          section.style.opacity = 1;
-          section.style.transform = "translateY(-35%)";
-        } else {
-          if (persist) {
-            tl.progress(1);
-            section.classList.add("visible");
-            section.style.opacity = 1;
-            const overshoot = (p - leavePct) / Math.max(0.001, (1 - leavePct));
-            section.style.transform = `translateY(-35%) translateY(${overshoot * 8}vh)`;
+          // Inside active range: 3-Phase Smoothstep
+          const rel = (p - enterPct) / (leavePct - enterPct);
+          let opacity = 1;
+          let yOffset = 0;
+
+          if (rel < 0.28) {
+            // Phase 1: Glide-in (0.0 -> 0.28)
+            const t = smoothstep(0, 0.28, rel);
+            opacity = t;
+            yOffset = (1 - t) * 36; // Glide from +36px to 0px
+          } else if (rel > 0.72 && !persist) {
+            // Phase 3: Glide-out (0.72 -> 1.0)
+            const t = smoothstep(0.72, 1.0, rel);
+            opacity = 1 - t;
+            yOffset = -t * 32;       // Glide from 0px to -32px
           } else {
-            // CRITICAL: 4% fixed fade-out range — prevents overlap with next section
-            tl.progress(1);
-            const fadeRange = 0.04;
-            const overshoot = (p - leavePct) / fadeRange;
-            const fadeOut = Math.max(0, 1 - overshoot);
-            section.style.opacity = fadeOut;
-            section.style.transform = "translateY(-35%)";
-            section.classList.toggle("visible", fadeOut > 0.1);
+            // Phase 2: Stable Hold (0.28 -> 0.72)
+            opacity = 1;
+            yOffset = 0;
+          }
+
+          section.style.opacity = opacity;
+          section.style.pointerEvents = opacity > 0.2 ? "auto" : "none";
+          inner.style.transform = `translateY(${yOffset}px)`;
+        } else {
+          // After card's range
+          if (persist) {
+            section.style.opacity = 1;
+            section.style.pointerEvents = "auto";
+            inner.style.transform = "translateY(0px)";
+          } else {
+            section.style.opacity = 0;
+            section.style.pointerEvents = "none";
+            inner.style.transform = "translateY(-32px)";
           }
         }
-      },
+      }
     });
   });
 }
 ```
-
-**Bug to prevent (the most destructive bug in the ROKH project):** section positioning was using `top: Xvh` (viewport units) instead of `top: X%` (percentage of scroll-container). The scroll-container is 820vh tall, so `top: 50vh` was effectively `top: 6.25%` — putting every section in the top 6% of the scroll range, invisible because they overlapped each other. **Always use `%`, never `vh`.**
-
-**Bug to prevent (second most destructive):** original fade-out used `overshoot * 3` divisor where overshoot spanned the entire remaining scroll (`1 - leavePct`), causing sections to remain visible until ~50% scroll, overlapping with the next entering section. User feedback: "texts unreadable during scroll." **Always use fixed 4% fade range.**
 
 #### 9f. Counter Animations
 

@@ -4,15 +4,22 @@ description: Use when someone asks to turn a video into a website, create a scro
 compatibility: Requires bash_tool with ffmpeg/ffprobe and Python+Playwright available, plus create_file/str_replace. Input is a video file path (MP4, MOV, etc.); output is a standalone HTML deliverable.
 metadata:
   argument-hint: <video-file-path>
-  version: 2.0 (fork of video-to-website — see improvements.txt for full changelog and research citations)
+  version: 2.1 (production-hardened with continuous parallax crossfades, anti-cropping, and unified navigation — see improvements.txt)
   author: Abootaleb Moradi (ai-1.ir)
 ---
 
-# Video → Premium Scroll-Driven Website (v2)
+# Video → Premium Scroll-Driven Website (v2.1)
 
 Turn a video file into a luxury, scroll-driven animated website where the video plays as a canvas/video background scrubbed by scroll position, with section content layered on top. Ships as a static deliverable (HTML + CSS + JS + frames/video) that runs without a server, ideally as a single standalone HTML file.
 
 This skill is **opinionated and hardened**. Every "MUST" / "FORBIDDEN" / "CRITICAL" rule below is a scar from a real bug that cost 30+ minutes to diagnose on a production build, or a practice sourced from current (2026) web-performance research — see `improvements.txt` for the audit this fork was built from and `references/lessons-learned.md` for the original bug postmortems.
+
+**What's new in v2.1 (The Production UX & Kinematics Pass)**:
+- **Continuous Parallax Crossfades (Zero Instant Transitions)**: Solves user complaint *"scrolling causes instant transition between cards and not visually satisfactory"*. Replaces rigid binary opacity jumps with a 3-phase Smoothstep kinematic engine (glide-in +36px, stable hold, glide-out -32px) and 4–6% overlapping section ranges.
+- **Zero Card Cropping (Card Height Budget)**: Solves user complaint *"all pop up menues cropped and not truely shown by scroll"*. Enforces a strict ≤ 420px height budget on floating cards, fixed-height product images (105px `object-fit: contain`), and compact typography so 100% of content is visible on laptop displays.
+- **Lenis Inner-Scroll Protection**: Adds mandatory `data-lenis-prevent="true"` to scrollable cards so mouse wheel gestures inside cards are never hijacked by page scroll.
+- **Zero Pseudo-Element Overflow**: Eliminates negative insets (`inset: -40px -32px`) that caused unwanted horizontal scrollbars at the bottom of cards.
+- **Unified 3-Column Header & Hero Clearance**: Solves navbar flipping and logo collision bugs; provides `padding-top: calc(var(--header-h) + 36px)` clearance for hero titles.
 
 **What's new in v2** (full rationale in `improvements.txt`):
 - **Step 0: mandatory pre-flight video QC** — probe file size, codec, resolution, aspect ratio, and bitrate *before* any design work starts, and get an explicit weight decision from the user instead of discovering the file is too heavy after delivery.
@@ -83,13 +90,13 @@ If the user doesn't specify these, ask briefly or use sensible creative defaults
 5. **Direction variety** — sections enter from different directions (left, right, up, scale, clip).
 6. **Dark overlay for stats** — 0.88-0.92 opacity, counters animate up, only time center text is OK.
 7. **Counter animations** — all numbers count up from 0, never appear statically.
-8. **Massive typography** — hero 8rem+, section headings 4rem+.
+8. **Massive hero, but compact high-density cards** — hero can be bold (3.2–6.5rem), but floating section headings MUST be compact (`clamp(1.45rem, 2.2vw, 2.05rem)`) to guarantee the card height never exceeds 420px and crops on laptops.
 9. **CTA persists** — `data-persist="true"` keeps final section visible, never disappears.
 10. **Hero prominence + generous scroll** — hero gets 14%+ scroll range, 800vh+ total for 6 sections.
 11. **Side-aligned text ONLY** — all text in outer 40-50% zones (`align-left`/`align-right`), never center. Exception: stats with full dark overlay.
 12. **Circle-wipe hero reveal** — hero is standalone 100vh section, canvas reveals via `clip-path: circle()` as hero scrolls away.
 13. **Frame speed 1.8-2.2** — product animation completes by ~55% scroll. Below 1.8 feels sluggish.
-14. **Section fade-out: 4% fixed range** — sections fully disappear within 4% of scroll progress after `leavePct`. Slow fade-outs cause overlap with the next entering section.
+14. **Continuous Parallax Crossfade (Zero Dead Gaps)** — sections must overlap by 4–6% using a 3-phase Smoothstep kinematic curve (Phase 1 glide-in 28%, Phase 2 hold 44%, Phase 3 glide-out 28%). As card N ascends (-32px) and fades to 0, card N+1 ascends (+36px to 0) and fades to 1. Never jump opacity from 0 to 1; never leave empty dead gaps between sections.
 15. **Section position uses `%` of scroll-container, NEVER `vh`** — `top: 50vh` inside an 800vh container becomes `top: 6.25%` — every section stacks at the top and is invisible. This was the most destructive bug in the entire ROKH project.
 16. **Canvas bg color MUST be hardcoded identically in JS and CSS** — re-sampling at runtime causes 2-3% drift between canvas bg and panel bg → visible vertical seam.
 17. **No pop-up menus of any kind** — no scroll-pop side nav, no hover dropdowns on header nav, no exit-intent popups, no cookie banners. The only overlay allowed is a tap-to-open mobile menu.
@@ -100,6 +107,11 @@ If the user doesn't specify these, ask briefly or use sensible creative defaults
 22. **Review all 16+ screenshots yourself with `view`** — 0 issues allowed before delivery.
 23. **`prefers-reduced-motion` fallback is required** — wrap Lenis smooth-scroll init, GSAP entrance stagger, and any scroll-jacking behavior in a check; reduced-motion visitors get instant scroll, content visible without animation, and (for Path A) an autoplaying-but-non-scrubbed or static-poster video instead of scroll-scrubbed seeking. Verified via Playwright's `page.emulate_media(reduced_motion="reduce")`. See `references/qc-and-compression-research.md` §4.
 24. **Pre-flight QC (Step 0) was actually run** — you can state the source file's size, codec, and aspect ratio, and (if the file was moderate/large) the user's chosen weight tier.
+25. **Zero card cropping (Card Height Budget)** — every floating section card MUST fit completely inside a 768px-tall laptop viewport. Total internal height ≤ 420px. Images must use fixed max-height (105px with `object-fit: contain`), never unconstrained 1:1 aspect ratios.
+26. **Lenis inner-scroll protection** — any scrollable inner card container MUST declare `data-lenis-prevent="true"` to prevent Lenis from capturing wheel events and prematurely advancing the page scroll.
+27. **Zero pseudo-element overflow** — no negative insets (`inset: -Xpx`) on pseudo-elements inside cards with `overflow: auto`. Always add `overflow-x: hidden;` to permanently eliminate horizontal scrollbars.
+28. **Integrated 3-column header** — never inject isolated `position: fixed` return/portal buttons that overlap brand marks. Integrate portal chips inside the primary `.site-header` grid.
+29. **Header clearance for hero** — `.hero-standalone` must have `padding-top: calc(var(--header-h) + 36px)` so large titles are never sliced by the fixed navbar.
 
 
 ---
@@ -215,6 +227,12 @@ These are all real bugs. Each one cost 30+ minutes to diagnose on a production b
 | 52 | Using `-preset veryslow` for better compression at same CRF | Slower presets give diminishing returns — `veryslow` was only 4% smaller than `slow` at CRF 28, but took 3× longer to encode. Not worth the time cost for iterative development. | Use `-preset slow` as the default. Only escalate to `slower`/`veryslow` for final production delivery when every KB matters and encode time is not a concern. |
 | 53 | Delivering ONLY the 300kbps ultra-light version | User rejected it: "resolution dropped too much, useless." Aggressive compression is fine as a fallback for hostile network conditions, but should never be the primary deliverable. | Deliver THREE versions: `*-original.html` (full quality), `*.html` (recommended ~600kbps), `*-300k.html` (ultra-light). Let the user choose. The recommended version is the actual deliverable; the others are options. |
 | 54 | Deleting the English-translated name when fixing a Persian spelling mistake | User had "ابوطالب مرادی" (wrong) and asked to fix to "ابوالطالب مرادی." Fixing only the Persian text removed the bilingual `data-en="Abootaleb Moradi"` attribute, breaking the language toggle. | When fixing text in a bilingual site, preserve BOTH `data-fa` and `data-en` attributes. Edit the value, don't remove the translation. Scan with `grep 'data-en='` before and after the edit to confirm count is unchanged. |
+| 55 | Massive card typography + unconstrained 1:1 square product images | Card height reaches 850px+, exceeds 600px available laptop viewport → product cards, prices, and Add to Bag buttons chopped off at bottom ("pop up menues cropped and not truely shown by scroll") | Use High-Density Compact Layout: headings `clamp(1.45rem, 2.2vw, 2.05rem)`, images `height: 105px; object-fit: contain;`, card padding `22px 20px`, total height ≤ 420px. |
+| 56 | Negative insets on `::before`/`::after` inside scrollable cards (`inset: -40px -32px`) | With `overflow: auto`, negative insets extend beyond container boundaries and spawn an ugly horizontal scrollbar | Remove negative insets. Style `.section-inner` directly with glass background and borders. Set `overflow-x: hidden;`. |
+| 57 | Lenis smooth-scroll without `data-lenis-prevent="true"` on inner scrollable containers | Lenis hijacks all wheel events on window; scrolling over an inner container advances page scroll instead of scrolling the card, causing the card to immediately vanish | Add `data-lenis-prevent="true"` to all `.section-inner` elements with `overflow-y: auto`. |
+| 58 | Binary `opacity = 1` jump on enter + non-overlapping section spans | Cards pop into existence abruptly like a switch, sit frozen for 75% of scroll time, then snap out into a blank screen before next card pops in ("instant transition between cards") | Use Continuous Parallax Crossfade Engine: 3-phase Smoothstep interpolation (glide-in from +36px, stable hold, glide-out to -32px), with 4-6% overlapping section ranges. |
+| 59 | Standalone `position: fixed; top: 20px; right: 20px;` return button | Collides with brand logo in RTL and LTR, giving optical illusion of navbar jumping sides; hero title has no clearance for fixed navbar and gets sliced | Integrate portal chip into 3-column `.site-header`. Give hero `padding-top: calc(var(--header-h) + 36px);`. |
+| 60 | Misinterpreting "too much empty space" by over-compressing scroll container (< 400vh) | Scroll distance becomes too short (~280vh), mouse wheel flings through sections in fractions of a second, depleting or rushing 3D animations | Maintain 440vh - 480vh for 1:1 video scrub mapping, while compacting intra-card spacing. |
 
 
 ---
@@ -250,6 +268,11 @@ Real user feedback from the ROKH project, with the underlying bug and fix:
 | "حس می کنم صفحه سنگین شده. سرچ کن ببین چه راهکارهایی وجود داره. 2.6 مگابایت خیلی زیاده" (page feels heavy, search for solutions, 2.6MB is too much) | base64-inlined MP4 (1.57MB raw → 2.05MB base64) dominates standalone HTML size. CRF mode can't target specific file sizes. | Switch to 2-pass VBR encoding: `-b:v 600k -pass 1/2 -preset slow -g 10 -keyint_min 10 -pix_fmt yuv420p -movflags +faststart`. Result: 0.74MB MP4 → 1.52MB standalone (41% smaller). Solo visual assessment confirms "acceptable for luxury cosmetics" even at 300kbps. |
 | "گزینه 1 که هیچ تفاوتی نمی کنه. اگه اینترنت کاربر کند باشه صفحه خیلی دیر بالا میاد" (Option 1 [external video file] makes no difference, on slow internet page loads very late) | Splitting HTML from MP4 doesn't help if total download is the same — browser still needs both files before scrubbing works. The real bottleneck is total bytes, not file count. | The correct solution is to reduce total bytes via 2-pass compression, not to split files. External video is only useful when video streaming (range requests) is supported, which doesn't apply to local standalone HTML. |
 | "رزولوشنش خیلی کم شد. فایده نداره. یک دونه 1290k (اصلی) هم درست کن" (resolution dropped too much, useless, also make a 1290k original version) | 300kbps ultra-light version was too aggressive — Solo assessment looked "acceptable" but the user disagreed on actual viewing. Single-bitrate delivery is fragile. | Deliver THREE standalone HTML files at different bitrates: `*-original.html` (1290kbps source, 2.59MB), `*.html` (600kbps recommended, 1.52MB), `*-300k.html` (300kbps ultra-light, 1.04MB). Let user pick the right balance for their audience. |
+| "داداش نمیشه مدرن تر درست کنی؟؟ خیلی رو اعصابه فضای خالی توی صفحات خیلی زیاده به خاطر نمی دونم چی" (can't you make it more modern? too much empty space on pages) | Floating card padding (56px 48px), huge headings (5rem), and oversized margins created excessive dead whitespace inside cards and wide gaps | Redesign with High-Density Bento Grid & compact luxury styling: padding 22px 20px, margins 8-14px, heading 1.8-2.1rem. Do NOT shrink scroll container below 440vh. |
+| "the 3d showcases got broken. correct them. rokh got stucked. bmw the incoming menues and navbar texts got outside of the borders" | Global `$` selector broken when replaced with `$$`, and navbar had no top clearance for BMW title | Fixed selector `const $$ = (sel) => Array.from(document.querySelectorAll(sel));`, restored 1:1 scrub, added header clearance padding. |
+| "for bmw showcase the navbar on farsi is left and in english went to right. also the navbar covered the text BMW PARTS PRO" | Standalone floating back button at `top: 20px; right: 20px;` collided with brand logo on RTL and LTR, creating the illusion of navbar jumping sides; hero title lacked `padding-top` clearance | Remove floating button; embed `.portal-chip` inside 3-column header. Add `padding-top: calc(var(--header-h) + 36px)` to hero container. |
+| "on rokh all pop up menues cropped and not truely shown by scroll" | 850px card height exceeded 600px laptop viewport due to 1:1 square product images and 5rem headings; Lenis hijacked wheel events so user couldn't scroll card content | Apply High-Density Compact Layout (height ≤ 420px, images 105px contain). Add `data-lenis-prevent="true"` to `.section-inner`. Remove negative insets to fix horizontal scrollbar. |
+| "in all 3d showcases the scrolling cause instant transition between cards and not visually satisfactory" | Binary opacity jump (0 to 1), non-overlapping section ranges with dead gaps, and 0.02 fast fade-out caused cards to abruptly pop in and pop out | Implement Continuous Parallax Crossfade Engine with 3-phase Smoothstep interpolation (+36px glide-in, hold, -32px glide-out) and 4-6% overlapping section ranges. |
 
 
 ---
@@ -374,6 +397,11 @@ Then call `present_files` on whatever landed in `/mnt/user-data/outputs/` — a 
 - **Sections overlap during scroll**: fade-out range too slow. Use fixed 4% fade range.
 - **15% discount text falling off hero corner**: Remove `.hero-corner-tl` entirely. Put promos in `.hero-meta-row`.
 - **Subject doesn't move on language toggle**: Add `setTimeout(() => drawFrame(state.currentFrame), 60)` in `applyLanguage()`.
+- **Popup menu cropped at bottom on laptops**: Section card height exceeds 600px. Apply High-Density Compact Layout: headings `clamp(1.45rem, 2.2vw, 2.05rem)`, product images `height: 105px; object-fit: contain;`, card padding `22px 20px`. Total card height MUST stay ≤ 420px.
+- **Horizontal scrollbar at bottom of card**: A pseudo-element has negative insets (e.g. `inset: -40px -32px`). Remove negative insets and add `overflow-x: hidden;` to `.section-inner`.
+- **Card content cannot be scrolled by mouse wheel**: Lenis smooth-scroll is hijacking wheel events. Add `data-lenis-prevent="true"` to the scrollable container.
+- **Cards pop in or pop out instantly**: Binary opacity setting and non-overlapping section ranges. Implement the 3-phase Smoothstep Parallax Crossfade Engine and overlap adjacent section ranges by 4–6%.
+- **Navbar covers hero title**: Hero container lacks clearance for fixed header. Add `padding-top: calc(var(--header-h) + 36px);` and adjust title font-size to `clamp(3.2rem, 7.5vw, 6.5rem)`.
 
 
 ---

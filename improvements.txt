@@ -204,6 +204,53 @@ heads-up rather than a choice. See SKILL.md Step 0, point 3a, and
 references/qc-and-compression-research.md §1b.
 
 
+9. V2.1 IMPROVEMENTS — PRODUCTION CROPPING, NAVIGATION ALIGNMENT, AND CINEMATIC SCROLL CROSSFADES
+-------------------------------------------------------------------------------------------------
+In September 2026, after running production deployments of 3 diverse showcases (Rokh Luxury Cosmetics,
+BMW Parts Pro, and Lotus Elegance), extensive usability audits across laptop screens revealed 6 critical
+front-end failure modes that were not addressed in v2.0:
+
+1. Card Cropping on Standard Laptop Displays:
+   - Root Cause: Massive typography (5rem titles), 56px padding, and unconstrained 1:1 product images
+     expanded cards to 850px+ height. On 768p laptop viewports (usable height ~600px), card bottoms,
+     prices, and CTA buttons were completely chopped off.
+   - Fix: Established a strict Card Height Budget (total height ≤ 420px), compact titles
+     (`clamp(1.45rem, 2.2vw, 2.05rem)`), fixed product image heights (105px with `object-fit: contain`),
+     and tightened padding (22px 20px).
+
+2. Lenis Scroll Hijacking on Inner Containers:
+   - Root Cause: Lenis smooth-scroll intercepted mouse wheel events on `window`. When users tried
+     to scroll overflowing cards, Lenis scrolled the entire page instead of the card, making the card
+     instantly vanish.
+   - Fix: Added mandatory `data-lenis-prevent="true"` to all `.section-inner` elements.
+
+3. Ghost Horizontal Scrollbars:
+   - Root Cause: `.section-inner::before` used negative insets (`inset: -40px -32px`) for ambient glow,
+     which overflowed horizontally once `overflow-y: auto` was active.
+   - Fix: Eliminated negative insets and enforced `overflow-x: hidden;`.
+
+4. Continuous Parallax Crossfade Engine:
+   - Root Cause: ScrollTrigger binary opacity jumps, static 75% holds, non-overlapping section spans,
+     and abrupt 2% fade-outs caused cards to pop in and out abruptly ("instant transition between cards").
+   - Fix: Created a 3-Phase Smoothstep Kinematic Crossfade Engine:
+     * Phase 1 (0.00-0.28): Glide-in from +36px to 0px, opacity 0 -> 1 via Smoothstep.
+     * Phase 2 (0.28-0.72): Stable hold at 0px, opacity 1.
+     * Phase 3 (0.72-1.00): Glide-out from 0px to -32px, opacity 1 -> 0 via Smoothstep.
+     * Sections overlap by 4-6% to ensure a cinematic cross-dissolve with zero dead gaps.
+
+5. Unified 3-Column Header & Hero Clearance:
+   - Root Cause: Standalone fixed return buttons at `top: 20px; right: 20px;` collided with brand logos
+     in RTL and LTR layouts, giving the illusion that the navbar was flipping sides. Large hero titles
+     lacked top clearance and were obscured under fixed headers.
+   - Fix: Removed isolated floating buttons; integrated `.portal-chip` directly into the 3-column
+     `.site-header` grid. Added `padding-top: calc(var(--header-h) + 36px);` clearance to `.hero-standalone`.
+
+6. Scroll Container Distance Calibration:
+   - Root Cause: Prematurely shrinking scroll height below 400vh to "reduce whitespace" made wheel travel
+     too sensitive, flinging through 3D scrub animations too quickly.
+   - Fix: Maintained 440vh-480vh for precise 1:1 scrub mapping while compacting intra-card spacing.
+
+
 SOURCES CONSULTED
 =========================================================
 - superrendersfarm.com — "H.264 vs H.265: Video Encoding Guide for 3D
