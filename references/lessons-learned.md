@@ -203,3 +203,14 @@ After deploying multiple 3D scroll showcases in production (Rokh Luxury Cosmetic
      - Leverages browser hardware `video.fastSeek()` with rAF coalescing and 16ms delta check.
   4. **Mode 4: Native WebGL / Three.js 3D**:
      - Real-time GLB model rendering where scroll drives camera position or model rotation matrix.
+
+### 8. Monolithic Card Transitions vs. Creative Spatial Choreography (The 2026 Awwwards Standard)
+- **Symptom**: User feedback: *"رفت و آمد کارت ها اصلا جالب نیست. سرچ کن ببین مردم با اسکرول کارتشون چطور میاد میره. به خصوص اون دیزاینرهای خفن و خلاق"* (cards coming and going is not interesting at all. Search how creative designers do it, especially top award-winning studios).
+- **Root Cause**:
+  In early builds, section cards entered and exited as single monolithic blocks: the card container, heading, product photo, and button all translated together along the Y-axis as an undifferentiated solid rectangle. While mathematically functional, human perception reads monolithic translation as an "amateur template" or "basic slideshow." Real luxury interactive experiences (e.g. Apple AirPods/MacBook Pro, Stripe Press, Cuberto, Locomotive) never move cards as rigid blocks.
+- **The 5 Creative Solutions Formulated**:
+  1. **Pinned Deck Stacking (Apple/Stripe)**: Outgoing cards don't vanish into a void; they remain pinned in space and recede into the background (`scale: 0.92`, `blur: 8px`, `brightness: 0.4`) as incoming cards stack over them.
+  2. **3D Spatial Tilt (Cuberto)**: Using `perspective: 1200px` to give cards a pitch angle (`rotateX: 14deg`, `rotateY: -8deg`, `translateZ: -120px`) on entry, flattening out at resting focus.
+  3. **Micro-Choreographed Element Stagger (Apple/Linear)**: Deconstructing card internals into an orchestrated sequence: container glass → badge spring → masked heading reveal → floating image parallax (1.35x speed) → spring CTA.
+  4. **Arc Motion (Locomotive)**: Curved trajectory (`x: 35px, y: 55px, rot: 2.5deg` → `0, 0, 0deg` → `x: -25px, y: -45px, rot: -1.8deg`) replacing dry vertical lines.
+  5. **Velocity-Based Squash & Stretch**: Real-time wheel velocity driving elastic card deformation (`scaleY: 1.05`) with bouncy spring settle.

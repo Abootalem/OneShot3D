@@ -1334,6 +1334,286 @@ function setupSectionAnimations() {
 }
 ```
 
+#### 9e-creative. The 5 Creative Scrollytelling Card Transition Architectures (Awwwards & Apple Standards)
+
+When evaluating luxury scrollytelling websites, creative directors and design judges immediately penalize **monolithic movement** — where a card acts like a rigid, opaque rectangular box that simply fades in and out. Award-winning sites use sophisticated physics, spatial depth, and micro-choreography.
+
+Here are the **5 production architectures** with complete implementation code:
+
+---
+
+##### 1. Pinned Deck Stacking & Layered Depth (The Apple & Stripe Standard)
+In this pattern, **outgoing cards never vanish into thin air**. Instead, they remain pinned in 3D space like a deck of luxury playing cards. As Card (N+1) ascends over Card (N), Card (N) gently recedes into the background:
+- Scale reduces from `1.0` to `0.92`.
+- Blur increases to `filter: blur(8px)`.
+- Brightness drops to `0.4`.
+- Y-position shifts upward by `-24px`.
+
+```css
+/* Deck Stacking Container */
+.cards-deck-wrap {
+  position: relative;
+  width: 100%;
+  perspective: 1000px;
+}
+
+.deck-card {
+  position: sticky;
+  top: calc(var(--header-h) + 40px);
+  will-change: transform, filter, opacity;
+  transform-origin: center top;
+  transition: filter 0.3s ease;
+}
+```
+
+```javascript
+// GSAP Pinned Deck Stacking Implementation
+function setupDeckStacking() {
+  const cards = gsap.utils.toArray(".deck-card");
+  if (!cards.length) return;
+
+  cards.forEach((card, i) => {
+    if (i === cards.length - 1) return; // Last card stays active
+
+    ScrollTrigger.create({
+      trigger: card,
+      start: "top top+=" + (80 + i * 20),
+      end: "bottom top",
+      scrub: 0.5,
+      onUpdate: (self) => {
+        const p = self.progress;
+        // Recede into background as user scrolls past
+        gsap.set(card, {
+          scale: 1 - p * 0.08,             // Scale down to 0.92
+          y: -p * 24,                       // Subtle upward slip
+          filter: `blur(${p * 8}px) brightness(${1 - p * 0.6})`, // Blur & dim
+          opacity: 1 - p * 0.3              // Gentle transparency
+        });
+      }
+    });
+  });
+}
+```
+
+---
+
+##### 2. 3D Spatial Tilt & Perspective Depth (The Cuberto & Active Theory Standard)
+Simulates floating glass tiles suspended in true 3D space alongside the product.
+- **Entry**: Card tilts along the X and Y axes (`rotateX(14deg)`, `rotateY(-8deg)`) and starts in deep background (`translateZ(-120px)`).
+- **Focus**: Flattens out cleanly to `rotateX(0deg)`, `translateZ(0px)` for crisp legibility.
+- **Exit**: Slides back into deep space (`translateZ(-180px)`) and dissolves.
+
+```css
+.spatial-scene {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.spatial-card {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transform-origin: center center;
+}
+```
+
+```javascript
+// GSAP 3D Spatial Tilt Crossfade
+function setupSpatialTiltCards() {
+  document.querySelectorAll(".spatial-card").forEach((card) => {
+    const enterPct = parseFloat(card.dataset.enter) / 100;
+    const leavePct = parseFloat(card.dataset.leave) / 100;
+
+    ScrollTrigger.create({
+      trigger: "#scroll-container",
+      start: "top top",
+      end: "bottom bottom",
+      scrub: 0.4,
+      onUpdate: (self) => {
+        const p = self.progress;
+        if (p < enterPct || p > leavePct) {
+          card.style.opacity = 0;
+          card.style.pointerEvents = "none";
+          return;
+        }
+
+        const rel = (p - enterPct) / (leavePct - enterPct);
+
+        if (rel < 0.3) {
+          // Entry: Tilt & ascend from deep space
+          const t = rel / 0.3;
+          const ease = t * t * (3 - 2 * t);
+          gsap.set(card, {
+            opacity: ease,
+            y: (1 - ease) * 45,
+            z: (1 - ease) * -120,
+            rotateX: (1 - ease) * 14,
+            rotateY: (1 - ease) * -8,
+            pointerEvents: ease > 0.3 ? "auto" : "none"
+          });
+        } else if (rel > 0.7) {
+          // Exit: Recede into deep background
+          const t = (rel - 0.7) / 0.3;
+          const ease = t * t * (3 - 2 * t);
+          gsap.set(card, {
+            opacity: 1 - ease,
+            y: -ease * 35,
+            z: -ease * -160,
+            rotateX: -ease * 10,
+            pointerEvents: "none"
+          });
+        } else {
+          // Stable resting focus
+          gsap.set(card, {
+            opacity: 1,
+            y: 0,
+            z: 0,
+            rotateX: 0,
+            rotateY: 0,
+            pointerEvents: "auto"
+          });
+        }
+      }
+    });
+  });
+}
+```
+
+---
+
+##### 3. Micro-Choreographed Element Stagger (The Apple & Linear Standard)
+Instead of animating the card as a single unit, internal elements enter on a split timeline:
+1. **Glass Backdrop & Border Beam**: Container expands into view (`clip-path: inset(0% 0% 0% round 18px)`).
+2. **Category Badge**: Drops down with an elastic overshoot (`scale: 0.8 -> 1`).
+3. **Heading**: Words slide up through an overflow-hidden wrapper (Masked Reveal).
+4. **Product Image**: Parallaxes independently at **1.35x** scroll speed.
+5. **Specs & CTA**: Soft fade and spring forward.
+
+```javascript
+// Micro-Choreographed Internal Stagger
+function buildCardChoreography(section) {
+  const inner = section.querySelector(".section-inner");
+  const badge = section.querySelector(".product-badge, .section-label");
+  const heading = section.querySelector(".section-heading");
+  const img = section.querySelector(".product-image img");
+  const body = section.querySelector(".section-body, .product-desc");
+  const cta = section.querySelector(".cta-button");
+
+  const tl = gsap.timeline({ paused: true });
+
+  tl.fromTo(inner, 
+    { clipPath: "inset(12% 0% 12% 0% round 18px)", opacity: 0, y: 30 },
+    { clipPath: "inset(0% 0% 0% 0% round 18px)", opacity: 1, y: 0, duration: 0.8, ease: "power3.out" }
+  );
+
+  if (badge) {
+    tl.fromTo(badge,
+      { scale: 0.6, opacity: 0 },
+      { scale: 1.0, opacity: 1, duration: 0.5, ease: "back.out(2)" },
+      "-=0.6"
+    );
+  }
+
+  if (heading) {
+    tl.fromTo(heading,
+      { y: 24, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.6, ease: "power2.out" },
+      "-=0.4"
+    );
+  }
+
+  if (img) {
+    tl.fromTo(img,
+      { y: 35, scale: 0.92 },
+      { y: 0, scale: 1.0, duration: 0.7, ease: "power3.out" },
+      "-=0.5"
+    );
+  }
+
+  if (cta) {
+    tl.fromTo(cta,
+      { y: 15, opacity: 0 },
+      { y: 0, opacity: 1, duration: 0.4, ease: "power2.out" },
+      "-=0.3"
+    );
+  }
+
+  return tl;
+}
+```
+
+---
+
+##### 4. Arc Motion & Organic Liquid Drift (The Locomotive Standard)
+Linear movements feel mechanical. Arc motion drives the card along an organic curved trajectory with a subtle 2°–3° rotational tilt that simulates physical momentum:
+- **Entry**: `x: 35px`, `y: 55px`, `rotation: 2.5deg`.
+- **Resting**: `x: 0px`, `y: 0px`, `rotation: 0deg`.
+- **Exit**: `x: -25px`, `y: -45px`, `rotation: -1.8deg`.
+
+```javascript
+// Arc Motion Interpolation
+function applyArcMotion(inner, relProgress) {
+  // relProgress: 0.0 -> 1.0
+  if (relProgress < 0.28) {
+    const t = relProgress / 0.28;
+    const ease = t * t * (3 - 2 * t);
+    const x = (1 - ease) * 35;
+    const y = (1 - ease) * 55;
+    const rot = (1 - ease) * 2.5;
+    inner.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+  } else if (relProgress > 0.72) {
+    const t = (relProgress - 0.72) / 0.28;
+    const ease = t * t * (3 - 2 * t);
+    const x = -ease * 25;
+    const y = -ease * 45;
+    const rot = -ease * 1.8;
+    inner.style.transform = `translate(${x}px, ${y}px) rotate(${rot}deg)`;
+  } else {
+    inner.style.transform = "translate(0px, 0px) rotate(0deg)";
+  }
+}
+```
+
+---
+
+##### 5. Velocity-Based Squash & Elastic Settling
+Gives the card simulated mass. When the user flicks the mouse wheel, the card deforms elastically along the velocity vector:
+- Rapid scroll down: `scaleY: 1.04`, `scaleX: 0.98`.
+- Rapid scroll up: `scaleY: 0.96`, `scaleX: 1.02`.
+- When scroll stops: springs back to `scale(1.0)` with `elastic.out(1, 0.4)`.
+
+```javascript
+// Velocity-Based Inertia
+function setupVelocitySquash(cardInner) {
+  let proxy = { skew: 0, scaleY: 1 };
+  let clamp = gsap.utils.clamp(-12, 12);
+
+  ScrollTrigger.create({
+    onUpdate: (self) => {
+      let v = self.getVelocity() / 300;
+      let targetScale = 1 + Math.min(Math.abs(v) * 0.008, 0.06);
+      let targetSkew = clamp(v * 0.5);
+
+      gsap.to(cardInner, {
+        scaleY: targetScale,
+        skewY: targetSkew,
+        duration: 0.2,
+        ease: "power1.out",
+        overwrite: "auto",
+        onComplete: () => {
+          // Elastic rebound on rest
+          gsap.to(cardInner, {
+            scaleY: 1,
+            skewY: 0,
+            duration: 0.8,
+            ease: "elastic.out(1, 0.3)"
+          });
+        }
+      });
+    }
+  });
+}
+```
+
 #### 9f. Counter Animations
 
 ```js

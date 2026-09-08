@@ -113,6 +113,7 @@ If the user doesn't specify these, ask briefly or use sensible creative defaults
 28. **Integrated 3-column header** — never inject isolated `position: fixed` return/portal buttons that overlap brand marks. Integrate portal chips inside the primary `.site-header` grid.
 29. **Header clearance for hero** — `.hero-standalone` must have `padding-top: calc(var(--header-h) + 36px)` so large titles are never sliced by the fixed navbar.
 30. **Zero video scrub lag (The 4 Anti-Lag Modes)** — never use long-GOP video with unthrottled `scrub: true` (causes decoder bottleneck and massive frame drops on fast scroll). Implement one of the 4 proven modes: Mode 1 (Apple Canvas + WebP Image Sequence with 3-stage progressive stride loader and nearest-neighbor fallback for 120fps zero-lag), Mode 2 (All-Intra video with `keyint=1`), Mode 3 (Damped front-end scrubbing `scrub: 1.2` + `fastSeek` + rAF coalescing), or Mode 4 (Native WebGL/Three.js 3D).
+31. **Choreographed internal card reveals (Anti-Monolithic Standard)** — never animate section cards as single undifferentiated solid blocks. Break internal elements into a choreographed sequence: container glass → badge spring → masked title reveal → floating image parallax → price/CTA pop. Choose one of the 5 Creative Card Transition Architectures (Deck Stacking, 3D Spatial Tilt, Micro-Choreography, Arc Motion, or Velocity Squash).
 
 
 ---
@@ -161,6 +162,21 @@ All types use stagger (0.1-0.15s).
 - **Custom polygon**: `polygon(50% 0%, 50% 0%, 50% 100%, 50% 100%)` → `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%)`
 
 Always include the `-webkit-clip-path` prefix for Safari compatibility.
+---
+
+## Creative Card Transition Patterns (Award-Winning Scrollytelling Standards)
+
+Moving an entire card as an inert, monolithic rectangular block with basic Y-axis fade feels generic, robotic, and "AI-generated." Award-winning websites (Awwwards Site of the Year, Apple, Cuberto, Locomotive, Stripe, Linear) employ **tactile physical depth, spatial 3D perspective, and decoupled internal micro-choreography**:
+
+| Pattern | Inspiration | Visual Sensation | Kinematic Signature |
+|---------|-------------|------------------|---------------------|
+| **1. Pinned Deck Stacking** | Apple / Stripe | Physical card deck layering | Card N stays pinned; Card N+1 slides over it while Card N scales to `0.92`, blurs (`8px`), and dims (`brightness 0.4`). |
+| **2. 3D Spatial Tilt** | Cuberto / Active Theory | Floating glass tiles in 3D space | Enters with `perspective(1200px)` pitch tilt (`rotateX 14deg`, `rotateY -8deg`, `translateZ -120px`); flattens on resting focus. |
+| **3. Micro-Choreographed Stagger** | Apple / Linear | Living, responsive typography | Glass container wipes in → Badge drops with spring → Title reveals line-by-line via overflow mask → Product floats at 1.3x parallax → CTA pops. |
+| **4. Arc Motion & Liquid Drift** | Locomotive / Codrops | Organic, fluid catalog browsing | Moves along curved trajectory (`x: 35px, y: 60px, rotate: 2.5deg` → `0, 0, 0deg` → `x: -25px, y: -50px, rotate: -2deg`). |
+| **5. Velocity-Based Squash** | Codrops / Framer Motion | Tactile inertia & material weight | Card stretches along scroll vector (`scaleY 1.05`) on wheel flick; settles with `elastic.out(1, 0.4)` upon scroll rest. |
+
+Full implementation code, CSS perspective rules, and GSAP timelines for all 5 patterns are documented in `references/workflow-detail.md` §9e-creative.
 
 
 ---
@@ -235,6 +251,7 @@ These are all real bugs. Each one cost 30+ minutes to diagnose on a production b
 | 59 | Standalone `position: fixed; top: 20px; right: 20px;` return button | Collides with brand logo in RTL and LTR, giving optical illusion of navbar jumping sides; hero title has no clearance for fixed navbar and gets sliced | Integrate portal chip into 3-column `.site-header`. Give hero `padding-top: calc(var(--header-h) + 36px);`. |
 | 60 | Misinterpreting "too much empty space" by over-compressing scroll container (< 400vh) | Scroll distance becomes too short (~280vh), mouse wheel flings through sections in fractions of a second, depleting or rushing 3D animations | Maintain 440vh - 480vh for 1:1 video scrub mapping, while compacting intra-card spacing. |
 | 61 | Unthrottled long-GOP video scrubbing with `scrub: true` | Rapid mouse wheel scrolling floods the browser video decoder with hundreds of seek requests; decoder must seek to distant keyframes and rebuild forward, causing severe hitching, frame drops, and lag | Implement one of the 4 Anti-Lag Scrubbing Modes: Apple Canvas Image Sequence with nearest-neighbor fallback (Mode 1 - zero lag, 120fps), All-Intra `keyint=1` encoding (Mode 2), Damped `scrub: 1.2` with `video.fastSeek()` (Mode 3), or WebGL 3D (Mode 4). |
+| 62 | Monolithic block card transitions (rigid up/down fade of whole card) | Entire card moves as an inert solid rectangle; lacks physical depth, feeling like a cheap generic template or basic PowerPoint slide rather than a luxury award-winning interactive experience | Implement Creative Card Transition Patterns: Deck Stacking (Apple/Stripe), 3D Spatial Tilt (Cuberto), or Micro-Choreographed Element Stagger (Apple/Linear). |
 
 
 ---
@@ -277,6 +294,7 @@ Real user feedback from the ROKH project, with the underlying bug and fix:
 | "in all 3d showcases the scrolling cause instant transition between cards and not visually satisfactory" | Binary opacity jump (0 to 1), non-overlapping section ranges with dead gaps, and 0.02 fast fade-out caused cards to abruptly pop in and pop out | Implement Continuous Parallax Crossfade Engine with 3-phase Smoothstep interpolation (+36px glide-in, hold, -32px glide-out) and 4-6% overlapping section ranges. |
 | "سایتهای سه بعدی این باگ رو دارند که چون بر اساس رندر یک ویدیو هستند وقتی کاربر یک کم سریع اسکرول میکنه دچار یک لگ اساسی میشن و ظاهر خوبی نداره. راه حل؟؟" (3D sites have this bug where fast scroll causes massive lag because they render video. What's the solution?) | Browser video decoder bottleneck caused by seeking long-GOP video at 60+ Hz while user flicks mouse wheel. Decoder cannot decode fast enough and drops frames. | Deploy the 4 Anti-Lag Scrubbing Modes: (1) Apple Canvas + WebP Sequence with 3-stage progressive loading & nearest-neighbor fallback (zero lag at 120fps), (2) All-Intra video `keyint=1`, (3) Damped front-end scrubbing (`scrub: 1.2`) + `fastSeek`, or (4) Native WebGL 3D. |
 | "حالت اول رو درست کن" (implement the first mode / Apple Canvas sequence) | User selected Mode 1 (Apple Image Sequence) as the gold standard for zero lag | Converted video to WebP image sequence (120-240 frames), implemented 3-stage progressive loader (Frame 0 -> Stride 8 -> Pool) and nearest-loaded-neighbor fallback rendering on `<canvas>`. |
+| "رفت و آمد کارت ها اصلا جالب نیست. سرچ کن ببین مردم با اسکرول کارتشون چطور میاد میره. به خصوص اون دیزاینرهای خفن و خلاق" (cards coming and going is not interesting at all. Search how creative designers do it) | Monolithic card movement: card moves as a single solid block with simple opacity/Y translation, lacking tactile physical depth and element choreography | Implement the 5 Creative Card Transition Architectures: (1) Pinned Deck Stacking, (2) 3D Spatial Tilt & Perspective Depth, (3) Micro-Choreographed Element Stagger, (4) Arc Motion & Organic Drift, and (5) Velocity-based Squash & Elastic Settling. |
 
 
 ---

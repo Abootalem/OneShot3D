@@ -266,6 +266,19 @@ front-end failure modes that were not addressed in v2.0:
      * Mode 4 (Native WebGL 3D): Direct GPU 3D rendering driven by camera/rotation transforms.
 
 
+8. Creative Scrollytelling Card Transition Architectures (Awwwards & Apple Standards):
+   - Problem: Section cards moving as single monolithic blocks (undifferentiated solid rectangles fading in/out)
+     felt generic and uninspired. Users described it as "cards coming and going is not interesting at all."
+   - Fix: Formulated and documented the 5 industry-leading card transition architectures with complete code:
+     * Pattern 1 (Pinned Deck Stacking): Apple/Stripe-style card layering where outgoing cards recede into the
+       background (scale: 0.92, blur: 8px, brightness: 0.4) while incoming cards stack on top.
+     * Pattern 2 (3D Spatial Tilt): Cuberto-style 3D perspective with pitch/yaw angles and Z-depth translation.
+     * Pattern 3 (Micro-Choreographed Element Stagger): Apple/Linear-style decoupled element sequencing
+       (container glass -> badge spring -> masked typography -> 1.35x floating image parallax -> CTA pop).
+     * Pattern 4 (Arc Motion & Liquid Drift): Curved motion trajectories with 2-3 degree rotational inertia.
+     * Pattern 5 (Velocity-Based Squash & Stretch): Dynamic wheel-speed deformation with elastic settling.
+
+
 SOURCES CONSULTED
 =========================================================
 - superrendersfarm.com — "H.264 vs H.265: Video Encoding Guide for 3D
