@@ -10,6 +10,15 @@ Forked from a production skill hardened over 11+ real build iterations, with a v
 
 Point it at a video and it researches comparable premium sites, decides between video-scrub and frame-extraction rendering, and builds a Lenis + GSAP ScrollTrigger scroll experience — animated section reveals, a horizontal marquee, counter animations, bilingual RTL/LTR support — all QA'd against 53 documented anti-patterns before delivery.
 
+## What's new in v2.2 (The Dr. Moradi Executive Portrait Engine)
+
+- **Path B-Alpha: Transparent Cutout Character Engine** — Canvas context uses `alpha: true` with transparent WebP sequences. Character scales to 84% viewport height and is clamped to a 28% screen-width ceiling on desktop to eliminate overlap with editorial columns.
+- **Dynamic RTL/LTR Character Mirroring** — Leader stands on the RIGHT edge in RTL (`dir="rtl"`) and mirrors to the LEFT edge in LTR (`dir="ltr"`). Re-rendered instantly on language toggle.
+- **3-Tier Progressive Preloader** — 16 strategic keyframes load first (<300ms FMP), followed by Stride-3 background hydration (250ms), and full pool loading (600ms), backed by a 3.5s safety timeout and +/-25 frame nearest-neighbor fallback.
+- **Architectural CSS Atmosphere System** — Completely purges childish canvas star particles in favor of a 5-layer pure-CSS atmospheric system (precision grid, directional stage lighting, canvas, ambient glow puddle, focus vignette).
+- **2-Column Synchronized Editorial Grid (`.stage-grid`)** — Integrates `.editorial-stage` (strategic theses) alongside `.intelligence-core` (live telemetry, metrics grid, swarm logs, CLI consoles) with HUD framing brackets.
+- **18-66-16 Editorial Smoothstep Kinematics** — 66% of scroll range is dedicated to undisturbed, 100% solid opacity reading, with smooth 18% glide-in and 16% glide-out.
+
 ## What's new in v2
 
 - **Step 0 pre-flight QC** — probes file size, codec, resolution, and aspect ratio *before* any design work starts, and asks a single up-front question (heavy/cinematic vs. robust/compressed vs. network-adaptive) instead of discovering the deliverable is too heavy after the fact.
@@ -24,6 +33,7 @@ Point it at a video and it researches comparable premium sites, decides between 
 Built with the workflow this skill encodes:
 
 - [ROKH Cosmetics](https://ai-1.ir/showcase/beautyorg) — the original 11-iteration case study documented in `references/lessons-learned.md`
+- [Dr. Abootaleb Moradi - Enterprise AI Architect](https://ai-1.ir/showcase/dr-moradi) — the executive portrait showcase documented in `references/dr-moradi-engine.md`
 - [BMW Parts Pro](https://ai-1.ir/showcase/bmw)
 - [Lotus Jewels](https://ai-1.ir/showcase/lotus-standalone)
 
@@ -49,7 +59,8 @@ OneShot3D/
     ├── workflow-detail.md                # full step-by-step build commands (ffmpeg, HTML/CSS/JS)
     ├── lessons-learned.md                 # annotated production postmortems
     ├── templates-and-scripts.md           # copy-paste CSS/JS blocks
-    └── qc-and-compression-research.md     # v2: QC thresholds, compression recipes, a11y patterns, sources
+    ├── qc-and-compression-research.md     # v2: QC thresholds, compression recipes, a11y patterns, sources
+    └── dr-moradi-engine.md                # v2.2: Dr. Moradi executive portrait engine architecture
 ```
 
 ## License
@@ -65,6 +76,6 @@ Contact: [Telegram](https://t.me/+989398770326) · [email](mailto:Abootalebmorad
 
 ## درباره
 
-این اسکیل توسط **دکتر ابوطالب مرادی** توسعه داده شده — بر پایهٔ تجربهٔ واقعی ساخت چند وب‌سایت اسکرولی لوکس (رُخ، بی‌ام‌و، لوتوس) که نمونه‌هاشون در بالا لینک شده. برای آموزش تخصصی مهندسی پرامپت، سیستم‌های ایجنتیک و ابزارهای هوش مصنوعی کاربردی، به [ai-1.ir](https://ai-1.ir) سر بزنید.
+این اسکیل توسط **دکتر ابوطالب مرادی** توسعه داده شده — بر پایهٔ تجربهٔ واقعی ساخت چند وب‌سایت اسکرولی لوکس (دکتر مرادی، رُخ، بی‌ام‌و، لوتوس) که نمونه‌هاشون در بالا لینک شده. برای آموزش تخصصی مهندسی پرامپت، سیستم‌های ایجنتیک و ابزارهای هوش مصنوعی کاربردی، به [ai-1.ir](https://ai-1.ir) سر بزنید.
 
 با این اسکیل، تنها با **یک پرامپت و یک ویدیو** می‌توان یک وب‌سایت کاملاً حرفه‌ای و اسکرولی ساخت. ویدیوی مورد نیاز را کاربر می‌تواند خودش آپلود کند، یا در صورت نداشتن ویدیوی آماده، از طریق یک MCP تولید ویدیو (مثل Higgsfield) در همان لحظه بسازد.

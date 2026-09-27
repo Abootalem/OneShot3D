@@ -4,11 +4,11 @@ description: Use when someone asks to turn a video into a website, create a scro
 compatibility: Requires bash_tool with ffmpeg/ffprobe and Python+Playwright available, plus create_file/str_replace. Input is a video file path (MP4, MOV, etc.); output is a standalone HTML deliverable.
 metadata:
   argument-hint: <video-file-path>
-  version: 2.1 (production-hardened with continuous parallax crossfades, anti-cropping, and unified navigation — see improvements.txt)
+  version: 2.2 (v2.1 + Dr. Moradi executive portrait engine — transparent alpha canvas, 3-tier progressive preloader, editorial 2-column grid, architectural CSS atmosphere)
   author: Abootaleb Moradi (ai-1.ir)
 ---
 
-# Video → Premium Scroll-Driven Website (v2.1)
+# Video → Premium Scroll-Driven Website (v2.2)
 
 Turn a video file into a luxury, scroll-driven animated website where the video plays as a canvas/video background scrubbed by scroll position, with section content layered on top. Ships as a static deliverable (HTML + CSS + JS + frames/video) that runs without a server, ideally as a single standalone HTML file.
 
@@ -20,6 +20,28 @@ This skill is **opinionated and hardened**. Every "MUST" / "FORBIDDEN" / "CRITIC
 - **Lenis Inner-Scroll Protection**: Adds mandatory `data-lenis-prevent="true"` to scrollable cards so mouse wheel gestures inside cards are never hijacked by page scroll.
 - **Zero Pseudo-Element Overflow**: Eliminates negative insets (`inset: -40px -32px`) that caused unwanted horizontal scrollbars at the bottom of cards.
 - **Unified 3-Column Header & Hero Clearance**: Solves navbar flipping and logo collision bugs; provides `padding-top: calc(var(--header-h) + 36px)` clearance for hero titles.
+
+**What's new in v2.2 (The Dr. Moradi Executive Portrait Engine)**:
+Sourced from the production Dr. Moradi executive showcase (ai-1.ir/showcase/dr-moradi) — a scroll-driven personal portfolio for C-suite audiences using transparent character cutouts composited over editorial content. Every addition below is production-validated in both RTL (Farsi) and LTR (English) at 1920px, 1440px, 1366px, 1280px, 1024px, 768px, 375px, and 320px viewports.
+
+- **Path B-Alpha: Transparent Cutout Character Engine**: New scrub method variant. Instead of full-bleed opaque frames (Path B) or `<video>` scrub (Path A), this mode extracts the subject with background removal (rembg/ffmpeg chromakey) into transparent WebP sequences. Canvas context uses `alpha: true` (NOT `alpha: false`) so the character floats as a composited layer while editorial content occupies the opposite side. Character is anchored to 84% viewport height and capped at 28% viewport width on desktop to prevent overlap with content columns.
+- **RTL/LTR Character Mirroring**: In RTL (`dir="rtl"`), character draws on the RIGHT side (`drawX = inset`); in LTR, mirrors to the LEFT (`drawX = cw - drawW - inset`). On mobile (< 768px), shifts to center-top with 70% height and 6% top offset. The `drawFrame()` function reads `document.documentElement.getAttribute("dir")` on every render call and adjusts positioning accordingly.
+- **3-Tier Progressive Preloader (Keyframe → Stride-3 → Full)**: Replaces the BMW-style stride-8 single-pass loader with a 3-stage pipeline optimized for transparent cutout sequences where every frame matters:
+  - **Tier 1 (Immediate)**: Load a curated keyframe array `[1, 5, 10, 20, 35, 50, 70, 90, 110, 130, 150, 170, 190, 210, 230, 240]`. Dismiss preloader after 5 keyframes load (~300ms on broadband). User sees character immediately.
+  - **Tier 2 (250ms delay)**: Load every 3rd frame (`i += 3`). Fills in motion gaps for smooth scroll feel.
+  - **Tier 3 (600ms delay)**: Load ALL remaining frames. Background pool, zero UI blocking.
+  - **±25 Frame Nearest-Neighbor Fallback**: If exact frame not loaded, scan backward then forward up to 25 frames to find the nearest available. Never show blank canvas.
+- **2-Column Editorial Grid Layout (`.stage-grid`)**: New layout architecture for executive/portfolio showcases. Column 1 holds `.editorial-stage` (eyebrow, title, lead paragraph, axiom quote with HUD brackets). Column 2 holds `.intelligence-core` (telemetry deck, data metrics, CLI terminal, or swarm nodes). Grid: `grid-template-columns: minmax(320px, 460px) minmax(320px, 440px)`. Collapses to single column below 1024px. Max-width capped at `min(65vw, 960px)` with `margin-right: 3vw` (RTL) / `margin-left: 3vw` (LTR).
+- **Architectural CSS Atmosphere System**: Replaces "childish star particles" (which drew explicit user complaint) with a dignified 5-layer atmospheric system — all pure CSS, zero JavaScript canvas painting:
+  1. `.architectural-grid`: Gold-tinted 52px grid lines with radial mask fade-out (`opacity: 0.65`).
+  2. `.stage-lighting`: Dual radial gradients providing directional warmth (RTL/LTR aware).
+  3. `#scrub-canvas`: The transparent character composited at z-index 4.
+  4. `.canvas-ambient-glow`: Blurred gold ellipse at character's feet (`filter: blur(36px)`).
+  5. `.video-vignette`: Radial vignette darkening edges to focus attention.
+- **Editorial Smoothstep Crossfade (18-66-16 Ratio)**: Refined from v2.1's 28-44-28 ratio based on user testing. Phase 1 glide-in uses 18% of span (translate +18px, blur 4px → 0). Phase 2 stable hold uses 66% of span (crystal clear, pointer-events active). Phase 3 glide-out uses 16% of span (translate 0 → -16px, blur 0 → 4px). The asymmetric ratio gives more reading time and faster exit, matching natural reading rhythm.
+- **HUD Bracket Corner Elements**: Spatial framing brackets `⌜ ⌝ ⌞ ⌟` on editorial cards using 14px border-corner CSS. Glow intensifies (opacity 0.45 → 0.90 + box-shadow) when parent `.scroll-section` becomes `.visible`, creating a "target lock" acquisition feel.
+- **Executive Color Palette (Sovereign Royal Gold)**: Production-tested dark palette for C-suite audiences — `--bg-dark: #060911`, `--gold: #d4af37`, `--gold-lt: #f3e5ab`, `--amber: #f59e0b`, `--emerald: #10b981`. Warm amber highlights for data values, emerald for verified/compliance signals. Zero neon, zero cyberpunk.
+- **Bilingual Data Attribute System**: Every text element carries `data-fa` and `data-en` attributes. Language toggle reads `currentLang` and applies `el.dataset[currentLang]` to `textContent`. Canvas `drawFrame()` is re-called after toggle to reposition character for the new text direction. `ScrollTrigger.refresh()` runs 100ms after toggle to recalculate positions.
 
 **What's new in v2** (full rationale in `improvements.txt`):
 - **Step 0: mandatory pre-flight video QC** — probe file size, codec, resolution, aspect ratio, and bitrate *before* any design work starts, and get an explicit weight decision from the user instead of discovering the file is too heavy after delivery.
@@ -114,6 +136,14 @@ If the user doesn't specify these, ask briefly or use sensible creative defaults
 29. **Header clearance for hero** — `.hero-standalone` must have `padding-top: calc(var(--header-h) + 36px)` so large titles are never sliced by the fixed navbar.
 30. **Zero video scrub lag (The 4 Anti-Lag Modes)** — never use long-GOP video with unthrottled `scrub: true` (causes decoder bottleneck and massive frame drops on fast scroll). Implement one of the 4 proven modes: Mode 1 (Apple Canvas + WebP Image Sequence with 3-stage progressive stride loader and nearest-neighbor fallback for 120fps zero-lag), Mode 2 (All-Intra video with `keyint=1`), Mode 3 (Damped front-end scrubbing `scrub: 1.2` + `fastSeek` + rAF coalescing), or Mode 4 (Native WebGL/Three.js 3D).
 31. **Choreographed internal card reveals (Anti-Monolithic Standard)** — never animate section cards as single undifferentiated solid blocks. Break internal elements into a choreographed sequence: container glass → badge spring → masked title reveal → floating image parallax → price/CTA pop. Choose one of the 5 Creative Card Transition Architectures (Deck Stacking, 3D Spatial Tilt, Micro-Choreography, Arc Motion, or Velocity Squash).
+32. **Path B-Alpha: transparent cutout canvas context uses lpha: true** — when building executive/portfolio showcases with background-removed subjects, canvas MUST be initialized with getContext('2d') (NOT getContext('2d', { alpha: false })). The lpha: false optimization from BMW-style full-bleed renders makes transparent pixels opaque black. See 
+eferences/dr-moradi-engine.md for the full implementation.
+33. **Character width cap at 28% viewport on desktop** — for Path B-Alpha, the drawFrame() function MUST clamp character width to cw * 0.28 when viewport ≥ 900px. Without this cap, the character overflows into the editorial content grid. Calibrated against 2-column .stage-grid at 1280px, 1366px, 1440px, and 1920px.
+34. **3-Tier preloader with fallback timer** — transparent cutout sequences require the 3-tier progressive preloader (Keyframe array → Stride-3 → Full pass) with a hard 3.5s fallback timer. Never rely solely on percentage-based preloader dismissal — slow connections will hang.
+35. **RTL/LTR character mirroring in drawFrame()** — every call to drawFrame() MUST read document.documentElement.getAttribute('dir') and position the character accordingly: RTL = right side (drawX = inset), LTR = left side (drawX = cw - drawW - inset). Language toggle MUST re-call drawFrame() after changing the dir attribute.
+36. **Architectural CSS Atmosphere (zero JS particles)** — never add JavaScript particle/star/web canvas generators for executive portfolios. Use the 5-layer pure-CSS atmosphere: architectural-grid (52px gold lines) → stage-lighting (directional radials) → scrub-canvas → canvas-ambient-glow (blurred gold ellipse) → video-vignette (radial darkening). All layers must have RTL/LTR CSS variants.
+37. **HUD bracket corner elements for editorial framing** — editorial stage cards and intelligence cores MUST have .hud-bracket corner elements (⌜ ⌝ ⌞ ⌟) using 14px border-corner CSS. Brackets glow on section activation via .scroll-section.visible .hud-bracket selector.
+38. **Editorial Smoothstep 18-66-16 ratio for executive showcases** — when building editorial/portfolio sites (not e-commerce), use the refined asymmetric crossfade: 18% glide-in, 66% stable hold, 16% glide-out. The longer hold gives executives more reading time for dense content.
 
 
 ---
@@ -123,7 +153,8 @@ If the user doesn't specify these, ask briefly or use sensible creative defaults
 Follow Step 0 (above) then these 10 steps in order. Step 0, and Steps 1 and 2, are mandatory decision points — never skip straight to ffmpeg. Full command-by-command detail (exact ffmpeg flags, complete HTML/CSS/JS code) for every step lives in `references/workflow-detail.md`; read that file before executing Step 3 onward. Video QC thresholds, compression-ladder recipes, the network-adaptive loader snippet, and the reduced-motion fallback pattern live in `references/qc-and-compression-research.md`.
 
 1. **Research similar websites (MANDATORY).** Before any design decision, produce a short reference synthesis — 3-5 comparable premium sites, a point of view, and borrowed tactics. Never jump straight to frame extraction.
-2. **Choose scrub method (MANDATORY).** Decide **video-scrub** (Path A — default, lighter, simpler, uses `<video>` + `object-fit`) vs **frame-extraction** (Path B — only when the layout needs the subject offset off-center with a specific pixel position, uses `<canvas>` + image sequence).
+2. **Choose scrub method (MANDATORY).** Decide **video-scrub** (Path A — default, lighter, simpler, uses <video> + object-fit) vs **frame-extraction** (Path B — when the layout needs the subject offset off-center with a specific pixel position, uses <canvas> + opaque image sequence) vs **transparent-cutout** (Path B-Alpha — **new in v2.2** — when the subject must float as a composited layer over editorial content with transparent background, uses <canvas alpha: true> + transparent WebP sequence). Path B-Alpha is the required choice for executive/portfolio character showcases (like Dr. Moradi) where the person's figure is composited alongside 2-column editorial content. See 
+eferences/dr-moradi-engine.md for the full implementation.
 3. **Analyze the video** — duration, resolution, orientation, subject position, via `ffprobe`.
 4. **Prepare the asset**: 4a (Path A) re-encode with short GOP (`-g 10 -keyint_min 10`) for smooth scrubbing; 4b (Path B) extract and compress frames to WebP.
 5. **Asset polish** — visually check (via `view`) extracted frames/video for quality, crop/letterbox handling.
@@ -426,6 +457,15 @@ Then call `present_files` on whatever landed in `/mnt/user-data/outputs/` — a 
 - **Navbar covers hero title**: Hero container lacks clearance for fixed header. Add `padding-top: calc(var(--header-h) + 36px);` and adjust title font-size to `clamp(3.2rem, 7.5vw, 6.5rem)`.
 - **Video scrub lags, stutters, or drops frames on fast scroll**: Long-GOP video decoder bottleneck. Replace with Mode 1 (Apple Canvas + WebP sequence with 3-stage progressive loading), re-encode with Mode 2 (`keyint=1`), or apply Mode 3 (damped `scrub: 1.2` + `video.fastSeek()`).
 
+- **Transparent cutout has visible white fringe around subject edges**: WebP transparency at low quality (q < 50) introduces alpha blending artifacts. Use q=65 minimum for transparent cutout frames. If fringe persists, pre-process with rembg using --alpha-matting flag.
+- **Character floats in wrong position after language toggle**: drawFrame() reads dir attribute but language toggle didn't re-call drawFrame(). Always call drawFrame(currentFrameIndex) inside toggleLanguage(), AFTER setting the new dir attribute on html.
+- **Character overlaps editorial content on 1280px laptops**: Character width exceeds the 28% cap. Ensure the width cap logic (if cw >= 900 and drawW > cw * 0.28, clamp it) is present in drawFrame().
+- **Ambient glow under character is mispositioned in LTR mode**: .canvas-ambient-glow uses left: 6vw (RTL). For LTR, must override with html[dir=ltr] .canvas-ambient-glow { left: auto; right: 6vw; }.
+- **Stage-lighting gradient illuminates wrong side after language toggle**: .stage-lighting uses directional radial gradients. Must have separate html[dir=ltr] .stage-lighting CSS block with mirrored gradient positions.
+- **Floating star/particle backgrounds on executive portfolio**: User explicitly called these childish. Remove JS particle generators. Use 5-layer CSS Architectural Atmosphere System (architectural-grid, stage-lighting, canvas, ambient-glow, vignette).
+- **HUD brackets dont glow when section visible**: Missing .scroll-section.visible .hud-bracket CSS selector. Add border-color and box-shadow glow rules.
+- **2-column grid overlaps on tablet**: Missing @media (max-width: 1024px) breakpoint. Grid must collapse to grid-template-columns: 1fr with max-width: 520px.
+- **Preloader stays visible forever on slow connections**: 3-tier loader missing the 3.5s fallback timer. Add setTimeout at 3500ms that force-dismisses the preloader regardless of load state.
 
 ---
 
@@ -449,6 +489,9 @@ The deliverable is complete when ALL of the following are true:
 14. ✅ Step 0 pre-flight QC was run and, if triggered, the user's weight decision (heavy / robust / network-adaptive) was honored in what got built.
 15. ✅ `prefers-reduced-motion` fallback verified via Playwright — content is visible and readable with animation disabled, no scroll-jack.
 16. ✅ If a Three.js/WebGL 3D scene was added (Step 6b), it was explicitly requested (not assumed from the word "3D" alone) and LCP still meets budget.
+17. ✅ If Path B-Alpha (transparent cutout), character never overlaps editorial content at any viewport ≥ 900px wide (28% width cap verified).
+18. ✅ If bilingual, language toggle re-renders canvas character position AND refreshes ScrollTrigger within 100ms.
+19. ✅ If using Architectural CSS Atmosphere, all 5 layers have RTL/LTR CSS variants and no JavaScript particle generators remain.
 
 
 ---
@@ -460,3 +503,5 @@ The deliverable is complete when ALL of the following are true:
 - `references/lessons-learned.md` — three annotated production postmortems (Path B frame-based, Path A video-scrub, multi-bitrate compression) explaining *why* each MUST/FORBIDDEN rule above exists. Read when a bug feels familiar, or when a user pushes back on a rule and you need the original reasoning.
 - `references/qc-and-compression-research.md` — **new in v2.** The Step 0 QC thresholds and `ffprobe` script, the full compression-ladder recipes (with 2026 codec benchmarks and citations), the network-adaptive loader snippet, the `prefers-reduced-motion` fallback pattern, and the Core Web Vitals case against unscoped "3D"/scroll-jacking. Read this before executing Step 0, and again before Step 4a/4b if the user picked "robust" or "network-adaptive."
 - `improvements.txt` (skill root) — the audit this v2 fork was built from: what the original skill already did well, where it fell short of current best practice, what changed and why, and the sources consulted. Read this if you want the *reasoning* behind the v2 changes rather than just the instructions.
+- 
+eferences/dr-moradi-engine.md — **new in v2.2.** The complete Dr. Moradi executive portrait engine architecture: Path B-Alpha transparent cutout canvas code, 3-tier progressive preloader implementation, 2-column editorial grid CSS, 5-layer architectural CSS atmosphere system, RTL/LTR character mirroring math, editorial smoothstep crossfade (18-66-16 ratio), HUD bracket corner elements, sovereign gold color palette variables, and bilingual data-attribute toggle system. Read this when building an executive/portfolio showcase with transparent character cutout compositing.
